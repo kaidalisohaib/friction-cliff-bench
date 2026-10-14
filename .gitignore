@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+# C++ / CUDA
+build/
+cmake-build-*/
+*.o
+*.so
+# Experiments / data (never commit raw data or checkpoints)
+logs/
+runs/
+wandb/
+outputs/
+data/
+*.pt
+*.ckpt
+*.onnx
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
