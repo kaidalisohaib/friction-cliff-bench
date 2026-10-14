@@ -18,15 +18,15 @@ DT = 0.02
 def cornering_stiffness(p: VehicleParams, s=DRY):
     L = p.L
     Fzf, Fzr = p.m * G * p.lr / L, p.m * G * p.lf / L
-    return s.B * p.B_scale_f * s.C * s.mu * Fzf, s.B * p.B_scale_r * s.C * s.mu * Fzr
+    return s.By * p.B_scale_f * s.Cy * s.mu * Fzf, s.By * p.B_scale_r * s.Cy * s.mu * Fzr
 
 
 # --- V1 ------------------------------------------------------------------------------------------------
-@pytest.mark.parametrize("b_scale_r", [1.0, 1.25], ids=["neutral", "understeer"])
-def test_v1_linear_regime_steady_yaw_rate(b_scale_r):
+@pytest.mark.parametrize("scales", [(1.0, 1.0), (P.B_scale_f, P.B_scale_r)], ids=["neutral", "default_understeer"])
+def test_v1_linear_regime_steady_yaw_rate(scales):
     """r_ss = v*delta / (L + K_us v^2), K_us = (m/L)(lr/Cf - lf/Cr), within 2% at small delta.
     Speed is held by a P controller (small drive force, negligible combined-slip effect)."""
-    p = P.with_(B_scale_r=b_scale_r)
+    p = P.with_(B_scale_f=scales[0], B_scale_r=scales[1])
     Cf, Cr = cornering_stiffness(p)
     K_us = p.m / p.L * (p.lr / Cf - p.lf / Cr)
     speeds = np.array([10.0, 15.0, 20.0, 25.0])
@@ -48,7 +48,7 @@ def test_v1_linear_regime_steady_yaw_rate(b_scale_r):
     d = x[:, IDELTA]
     r_pred = x[:, IVX] * d / (p.L + K_us * x[:, IVX] ** 2)
     np.testing.assert_allclose(r_meas, r_pred, rtol=0.02)
-    if b_scale_r > 1.0:
+    if scales[1] > scales[0]:
         assert K_us > 0 and np.all(r_meas < x[:, IVX] * d / p.L)  # understeer: less yaw than kinematic
 
 
@@ -146,23 +146,29 @@ def steady_turn(v=15.0, R=100.0, steps=600):
 @pytest.mark.parametrize("which", ["rear", "front"])
 def test_v5_mu_step_transients(which):
     """Steady dry turn (15 m/s, R = 100 m, a_y = 2.25 m/s^2), steering frozen, then one axle -> ice.
-    Hand calc of the initial yaw acceleration. Dry axle forces: Fyf = m a_y lr/L = 1933 N,
-    Fyr = m a_y lf/L = 1667 N; loads Fz(f,r) = 8429, 7267 N; dry slip angles alpha = Fy/(B C mu Fz) ~ 0.012 rad.
-    At the *same* slip angle the iced axle is on the linear part of the ice curve (D11: shape changes too):
-      F_ice = (B C mu Fz)_ice * alpha = 4*2*0.1*Fz*0.012 ~ 70-80 N  (far below the 0.1*Fz ice peak)
-      rear ice:  (lf*1933 - lr*70)/Iz  = +0.86 rad/s^2 -> oversteer, beta opposite in sign to r
-      front ice: (lf*81 - lr*1667)/Iz  = -0.86 rad/s^2 -> understeer, yaw rate collapses"""
-    sim, u = steady_turn()
-    x_before = sim.get_state()[0]
-    r0 = x_before[IR]
+    Hand calc of the initial yaw acceleration (linear tires, static loads):
+      dry axle forces Fyf = m a_y lr/L, Fyr = m a_y lf/L; dry slip angles alpha_i = Fy_i / C_i(dry).
+      At the *same* slip angle the iced axle sits on the linear part of the ice curve (D11: the shape
+      changes, not only mu), so F_ice = C_i(ice) * alpha_i, far below the 0.1*Fz ice peak.
+      rear ice:  (lf Fyf - lr C_r(ice) alpha_r)/Iz > 0 -> oversteer, beta opposite in sign to r
+      front ice: (lf C_f(ice) alpha_f - lr Fyr)/Iz < 0 -> understeer, the yaw rate collapses"""
+    v, R = 15.0, 100.0
+    ay = v * v / R
+    Fyf, Fyr = P.m * ay * P.lr / P.L, P.m * ay * P.lf / P.L
+    Cf_d, Cr_d = cornering_stiffness(P, DRY)
+    Cf_i, Cr_i = cornering_stiffness(P, ICE)
+    if which == "rear":
+        expected = (P.lf * Fyf - P.lr * Cr_i * Fyr / Cr_d) / P.Iz
+    else:
+        expected = (P.lf * Cf_i * Fyf / Cf_d - P.lr * Fyr) / P.Iz
+    sim, u = steady_turn(v, R)
+    r0 = sim.get_state()[0, IR]
     ice = surface_vec(ICE)
     dry = surface_vec(DRY)
     sim.set_surfaces(dry if which == "rear" else ice, ice if which == "rear" else dry)
     sim.step(u)
     sim.step(u)
-    r_2 = sim.get_state()[0, IR]
-    yaw_acc = (r_2 - r0) / (2 * DT)
-    expected = 0.86 if which == "rear" else -0.86
+    yaw_acc = (sim.get_state()[0, IR] - r0) / (2 * DT)
     assert yaw_acc == pytest.approx(expected, rel=0.15)
     for _ in range(48):  # 1 s total
         sim.step(u)

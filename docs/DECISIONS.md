@@ -76,3 +76,19 @@ equally. Chosen: **B**. RL DR uses extra actuator delay 0–40 ms on both channe
 {0, 20, 40} ms; the M-L estimator also regresses the extra delay. H2 axis 3 moves to +{60, 100, 140} ms, beyond
 what either side has seen. Why: keeps the realistic robustness of DR without rigging H2 in RL's
 favour. Cost: M-B bank is ~3× larger. Supersedes the "remove delay from DR" proposal.
+
+## D15: Tire surfaces re-sourced; separate longitudinal and lateral curves; understeer via axle stiffness. DECIDED 2026-10-14 (proposed values; frozen at G1 with D13)
+Found in P1: the DESIGN "typical MF coefficients" (MathWorks Simscape table) describe *longitudinal* force only.
+Applied to lateral slip they put the ice lateral peak at ~21 deg (measured: 2-4 deg, CRREL). And with equal tire
+coefficients on both axles a bicycle model is exactly neutral-steer. Changes:
+1. Each surface has separate pure-slip curves (Bx, Cx, Ex) and (By, Cy, Ey), combined by the normalized
+   slip-vector rule Fx = (sx/s) Fx0(s), Fy = (sy/s) Fy0(s). This keeps |F| <= mu Fz exactly (S4) and reduces to
+   each pure curve; friction-ellipse H2 variant unchanged in spirit.
+2. Longitudinal shapes: least-squares fit to Burckhardt (1993) mu-slip curves (`scripts/fit_surfaces.py`,
+   max error ~3% of peak). Lateral: dry/wet with Pacejka's typical C = 1.3, C_alpha/Fz = 17/rad, peaks at 7/6 deg;
+   ice C = 1.6 with peak at 3 deg and marked drop-off, snow C = 1.0 rising to ~15 deg (CRREL measurements).
+3. Peak mu keeps the frozen prereg V7 ranges; only shapes change.
+4. Per-axle lateral stiffness scales 0.80 / 1.52 give an understeer gradient of ~2.0 deg/g on dry (typical 2-3
+   deg/g); to be sanity-checked on comma data in P5.
+Consequences: dry/wet steady cornering limit within 3% of sqrt(mu g R) (V2b); ice now ~0.96, snow ~0.92 (by
+design: snow lateral force approaches its peak only at large angles). Sources still to strengthen: primary CRREL report text, a published lateral MF parameter set for a passenger tire.

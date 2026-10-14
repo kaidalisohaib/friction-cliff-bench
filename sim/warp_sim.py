@@ -19,6 +19,8 @@ from sim.tire import ALPHA_MAX, ONE_PLUS_KAPPA_MIN, S_EPS
 wp.config.quiet = True
 
 vec13 = wp.types.vector(length=NX, dtype=wp.float32)
+# surface per axle: (mu, Bx, Cx, Ex, By, Cy, Ey, unused)
+vec8 = wp.types.vector(length=8, dtype=wp.float32)
 
 _G = wp.constant(wp.float32(9.81))
 _RHO = wp.constant(wp.float32(1.225))
@@ -79,26 +81,24 @@ def mf(x: wp.float32, B: wp.float32, C: wp.float32, D: wp.float32, E: wp.float32
 
 
 @wp.func
-def tire(kappa: wp.float32, alpha: wp.float32, Fz: wp.float32, B: wp.float32, C: wp.float32,
-         mu: wp.float32, E: wp.float32, ca: wp.float32) -> wp.vec2:
+def tire(kappa: wp.float32, alpha: wp.float32, Fz: wp.float32, s: vec8, ca: wp.float32) -> wp.vec2:
     a = wp.clamp(alpha, -_ALPHA_MAX, _ALPHA_MAX)
     opk = wp.max(wp.float32(1.0) + kappa, _OPK_MIN)
     sx = kappa / opk
     sy = wp.tan(a) / opk
-    D = mu * Fz
+    D = s[0] * Fz
     sn = wp.sqrt(sx * sx + sy * sy)
     fx = wp.float32(0.0)
     fy = wp.float32(0.0)
     if sn > _S_EPS:
-        F = mf(sn, B, C, D, E)
-        fx = F * sx / sn
-        fy = F * sy / sn
+        fx = mf(sn, s[1], s[2], D, s[3]) * sx / sn
+        fy = mf(sn, s[4], s[5], D, s[6]) * sy / sn
     if ca != wp.float32(0.0):
-        fx_e = mf(sx, B, C, D, E)
+        fx_e = mf(sx, s[1], s[2], D, s[3])
         ratio = wp.float32(0.0)
         if D > wp.float32(0.0):
             ratio = fx_e / D
-        fy_e = mf(wp.tan(a), B, C, D, E) * wp.sqrt(wp.clamp(wp.float32(1.0) - ratio * ratio, wp.float32(0.0), wp.float32(1.0)))
+        fy_e = mf(wp.tan(a), s[4], s[5], D, s[6]) * wp.sqrt(wp.clamp(wp.float32(1.0) - ratio * ratio, wp.float32(0.0), wp.float32(1.0)))
         fx = (wp.float32(1.0) - ca) * fx + ca * fx_e
         fy = (wp.float32(1.0) - ca) * fy + ca * fy_e
     return wp.vec2(fx, fy)
@@ -125,9 +125,9 @@ def clip_circle(f: wp.vec2, fmax: wp.float32) -> wp.vec2:
 
 @wp.func
 def wheel_update(omega: wp.float32, T_drive: wp.float32, T_brake: wp.float32, Fx: wp.float32,
-                 vxw: wp.float32, alpha: wp.float32, Fz: wp.float32, B: wp.float32, C: wp.float32,
-                 mu: wp.float32, E: wp.float32, p: Params, dt: wp.float32) -> wp.float32:
-    Fx_h = tire(slip_ratio(p.R_w, omega + _FD, vxw, p.eps_v), alpha, Fz, B, C, mu, E, p.combined_alpha)[0]
+                 vxw: wp.float32, alpha: wp.float32, Fz: wp.float32, srf: vec8, p: Params,
+                 dt: wp.float32) -> wp.float32:
+    Fx_h = tire(slip_ratio(p.R_w, omega + _FD, vxw, p.eps_v), alpha, Fz, srf, p.combined_alpha)[0]
     dFx = (Fx_h - Fx) / _FD
     k = wp.max((p.R_w * dFx + p.b_w) / p.Jw, wp.float32(0.0))
     denom = wp.float32(1.0) + dt * k
@@ -141,9 +141,9 @@ def wheel_update(omega: wp.float32, T_drive: wp.float32, T_brake: wp.float32, Fx
 
 
 @wp.func
-def substep(x: vec13, u_steer: wp.float32, u_long: wp.float32, p: Params, sf: wp.vec4, sr: wp.vec4,
+def substep(x: vec13, u_steer: wp.float32, u_long: wp.float32, p: Params, sf: vec8, sr: vec8,
             dt: wp.float32) -> vec13:
-    # sf, sr = (B, C, mu, E) effective per axle (B already scaled)
+    # sf, sr = (mu, Bx, Cx, Ex, By, Cy, Ey, -) per axle, lateral B already scaled
     vx = x[3]
     vy = x[4]
     r = x[5]
@@ -183,11 +183,11 @@ def substep(x: vec13, u_steer: wp.float32, u_long: wp.float32, p: Params, sf: wp
     alpha_f = -wp.atan2(vyf, wp.abs(vxf))
     alpha_r = -wp.atan2(vyr, wp.abs(vxr))
 
-    Ff = tire(slip_ratio(p.R_w, wf, vxf, p.eps_v), alpha_f, Fzf, sf[0], sf[1], sf[2], sf[3], p.combined_alpha)
-    Fr = tire(slip_ratio(p.R_w, wr, vxr, p.eps_v), alpha_r, Fzr, sr[0], sr[1], sr[2], sr[3], p.combined_alpha)
+    Ff = tire(slip_ratio(p.R_w, wf, vxf, p.eps_v), alpha_f, Fzf, sf, p.combined_alpha)
+    Fr = tire(slip_ratio(p.R_w, wr, vxr, p.eps_v), alpha_r, Fzr, sr, p.combined_alpha)
 
-    wf = wheel_update(wf, Tdf, Tbf, Ff[0], vxf, alpha_f, Fzf, sf[0], sf[1], sf[2], sf[3], p, dt)
-    wr = wheel_update(wr, Tdr, Tbr, Fr[0], vxr, alpha_r, Fzr, sr[0], sr[1], sr[2], sr[3], p, dt)
+    wf = wheel_update(wf, Tdf, Tbf, Ff[0], vxf, alpha_f, Fzf, sf, p, dt)
+    wr = wheel_update(wr, Tdr, Tbr, Fr[0], vxr, alpha_r, Fzr, sr, p, dt)
 
     if p.sigma_relax > zero:
         fyf_l = fyf_l + wp.min(dt * wp.abs(vxf) / p.sigma_relax, one) * (Ff[1] - fyf_l)
@@ -195,8 +195,8 @@ def substep(x: vec13, u_steer: wp.float32, u_long: wp.float32, p: Params, sf: wp
     else:
         fyf_l = Ff[1]
         fyr_l = Fr[1]
-    Faf = clip_circle(wp.vec2(Ff[0], fyf_l), sf[2] * Fzf)
-    Far = clip_circle(wp.vec2(Fr[0], fyr_l), sr[2] * Fzr)
+    Faf = clip_circle(wp.vec2(Ff[0], fyf_l), sf[0] * Fzf)
+    Far = clip_circle(wp.vec2(Fr[0], fyr_l), sr[0] * Fzr)
 
     Fx_fb = Faf[0] * c - Faf[1] * s
     Fy_fb = Faf[0] * s + Faf[1] * c
@@ -241,8 +241,8 @@ def substep(x: vec13, u_steer: wp.float32, u_long: wp.float32, p: Params, sf: wp
 
 @wp.kernel
 def step_kernel(params: wp.array(dtype=Params), state: wp.array(dtype=vec13), buf: wp.array3d(dtype=wp.float32),
-                actions: wp.array2d(dtype=wp.float32), surf_f: wp.array(dtype=wp.vec4),
-                surf_r: wp.array(dtype=wp.vec4), nsub: int, dt: wp.float32):
+                actions: wp.array2d(dtype=wp.float32), surf_f: wp.array(dtype=vec8),
+                surf_r: wp.array(dtype=vec8), nsub: int, dt: wp.float32):
     i = wp.tid()
     p = params[i]
     # action delay buffer: index j holds the action from j control steps ago
@@ -256,16 +256,17 @@ def step_kernel(params: wp.array(dtype=Params), state: wp.array(dtype=vec13), bu
     u_l = buf[i, p.delay_steps, 1]
     sf = surf_f[i]
     sr = surf_r[i]
-    sf = wp.vec4(sf[0] * p.B_scale_f, sf[1], sf[2], sf[3])
-    sr = wp.vec4(sr[0] * p.B_scale_r, sr[1], sr[2], sr[3])
+    sf[4] = sf[4] * p.B_scale_f  # per-axle cornering-stiffness scale on lateral B
+    sr[4] = sr[4] * p.B_scale_r
     x = state[i]
     for _k in range(nsub):
         x = substep(x, u_s, u_l, p, sf, sr, dt)
     state[i] = x
 
 
-def surface_vec(s: Surface) -> np.ndarray:
-    return np.array([s.B, s.C, s.mu, s.E], dtype=np.float32)
+def surface_vec(s: Surface, mu: float | None = None) -> np.ndarray:
+    """(mu, Bx, Cx, Ex, By, Cy, Ey, 0) as float32; optionally override mu."""
+    return np.array([s.mu if mu is None else mu, s.Bx, s.Cx, s.Ex, s.By, s.Cy, s.Ey, 0.0], dtype=np.float32)
 
 
 class WarpSim:
@@ -279,8 +280,8 @@ class WarpSim:
         self.state = wp.zeros(n, dtype=vec13, device=device)
         self.buf = wp.zeros((n, BUF_LEN, 2), dtype=wp.float32, device=device)
         self.actions = wp.zeros((n, 2), dtype=wp.float32, device=device)
-        self.surf_f = wp.zeros(n, dtype=wp.vec4, device=device)
-        self.surf_r = wp.zeros(n, dtype=wp.vec4, device=device)
+        self.surf_f = wp.zeros(n, dtype=vec8, device=device)
+        self.surf_r = wp.zeros(n, dtype=vec8, device=device)
 
     def reset(self, x0: np.ndarray, u0=None) -> None:
         """Set the state; u0 (shape (2,) or (n, 2)) pre-fills the action delay buffer so a steady-state
@@ -293,10 +294,10 @@ class WarpSim:
         self.buf.assign(wp.array(b, dtype=wp.float32, device=self.device))
 
     def set_surfaces(self, sf, sr) -> None:
-        """sf, sr: Surface, or arrays of shape (n, 4) = (B, C, mu, E)."""
+        """sf, sr: Surface, or arrays of shape (n, 8) from surface_vec()."""
         for arr, s in ((self.surf_f, sf), (self.surf_r, sr)):
             v = surface_vec(s) if isinstance(s, Surface) else np.asarray(s, np.float32)
-            arr.assign(wp.array(np.ascontiguousarray(np.broadcast_to(v, (self.n, 4))), dtype=wp.vec4, device=self.device))
+            arr.assign(wp.array(np.ascontiguousarray(np.broadcast_to(v, (self.n, 8))), dtype=vec8, device=self.device))
 
     def step(self, actions) -> None:
         if isinstance(actions, wp.array):
@@ -311,3 +312,174 @@ class WarpSim:
 
     def get_state(self) -> np.ndarray:
         return self.state.numpy().reshape(self.n, NX).astype(np.float64)
+
+
+# --- friction field along a track (per-axle, per-substep) ---------------------------------------------
+_WIN = wp.constant(8)  # local projection search window [table points] (= 2 m at DS = 0.25 m)
+
+
+@wp.func
+def project_local(xs: wp.array2d(dtype=wp.float32), ys: wp.array2d(dtype=wp.float32), tid: int, npts: int,
+                  ds: wp.float32, px: wp.float32, py: wp.float32, hint: int) -> wp.vec3:
+    """Frenet (s, e, idx) of point p on track tid by local search around `hint` (left of travel: e > 0)."""
+    best_j = hint
+    best_d = wp.float32(1.0e30)
+    for k in range(2 * _WIN + 1):
+        j = wp.clamp(hint - _WIN + k, 0, npts - 1)
+        dx = xs[tid, j] - px
+        dy = ys[tid, j] - py
+        d = dx * dx + dy * dy
+        if d < best_d:
+            best_d = d
+            best_j = j
+    s_out = wp.float32(best_j) * ds
+    e_out = wp.float32(0.0)
+    best_seg = wp.float32(1.0e30)
+    for q in range(2):
+        a = best_j - 1 + q
+        if a >= 0 and a + 1 < npts:
+            tx = xs[tid, a + 1] - xs[tid, a]
+            ty = ys[tid, a + 1] - ys[tid, a]
+            seg2 = tx * tx + ty * ty
+            t = wp.clamp(((px - xs[tid, a]) * tx + (py - ys[tid, a]) * ty) / seg2, wp.float32(0.0), wp.float32(1.0))
+            qx = xs[tid, a] + t * tx
+            qy = ys[tid, a] + t * ty
+            d = (px - qx) * (px - qx) + (py - qy) * (py - qy)
+            if d < best_seg:
+                best_seg = d
+                s_out = (wp.float32(a) + t) * ds
+                e_out = (tx * (py - ys[tid, a]) - ty * (px - xs[tid, a])) / wp.sqrt(seg2)
+    return wp.vec3(s_out, e_out, wp.float32(best_j))
+
+
+@wp.func
+def field_weight(s: wp.float32, s_drop: wp.float32, lt: wp.float32, Lp: wp.float32) -> wp.float32:
+    s_end = s_drop + lt + Lp
+    up = wp.float32(0.0)
+    down = wp.float32(0.0)
+    if lt > wp.float32(0.0):
+        up = wp.clamp((s - s_drop) / lt, wp.float32(0.0), wp.float32(1.0))
+        down = wp.clamp(wp.float32(1.0) - (s - s_end) / lt, wp.float32(0.0), wp.float32(1.0))
+    else:
+        if s >= s_drop:
+            up = wp.float32(1.0)
+        if s < s_end:
+            down = wp.float32(1.0)
+    return wp.min(up, down)
+
+
+@wp.func
+def field_surface(s: wp.float32, prof: vec8, base: wp.array(dtype=vec8)) -> vec8:
+    # prof = (s_drop, lt, Lp, mu0, mu1, patch_surface_index, -, -); base[0] = dry shape
+    w = field_weight(s, prof[0], prof[1], prof[2])
+    a = base[0]
+    b = base[int(prof[5])]
+    a[0] = prof[3]
+    b[0] = prof[4]
+    return a * (wp.float32(1.0) - w) + b * w
+
+
+@wp.kernel
+def step_field_kernel(params: wp.array(dtype=Params), state: wp.array(dtype=vec13), buf: wp.array3d(dtype=wp.float32),
+                      actions: wp.array2d(dtype=wp.float32), track_id: wp.array(dtype=int),
+                      track_x: wp.array2d(dtype=wp.float32), track_y: wp.array2d(dtype=wp.float32),
+                      track_n: wp.array(dtype=int), ds: wp.float32, prof: wp.array(dtype=vec8),
+                      base: wp.array(dtype=vec8), hints: wp.array2d(dtype=int), frenet: wp.array2d(dtype=wp.float32),
+                      axle_mu: wp.array2d(dtype=wp.float32), nsub: int, dt: wp.float32):
+    i = wp.tid()
+    p = params[i]
+    for jj in range(_BUF - 1):
+        j = _BUF - 1 - jj
+        buf[i, j, 0] = buf[i, j - 1, 0]
+        buf[i, j, 1] = buf[i, j - 1, 1]
+    buf[i, 0, 0] = actions[i, 0]
+    buf[i, 0, 1] = actions[i, 1]
+    u_s = buf[i, p.delay_steps, 0]
+    u_l = buf[i, p.delay_steps, 1]
+    tid = track_id[i]
+    npts = track_n[tid]
+    pr = prof[i]
+    x = state[i]
+    hf = hints[i, 1]
+    hr = hints[i, 2]
+    sf = vec8()
+    sr = vec8()
+    for _k in range(nsub):
+        c = wp.cos(x[2])
+        s_ = wp.sin(x[2])
+        qf = project_local(track_x, track_y, tid, npts, ds, x[0] + p.lf * c, x[1] + p.lf * s_, hf)
+        qr = project_local(track_x, track_y, tid, npts, ds, x[0] - p.lr * c, x[1] - p.lr * s_, hr)
+        hf = int(qf[2])
+        hr = int(qr[2])
+        sf = field_surface(qf[0], pr, base)
+        sr = field_surface(qr[0], pr, base)
+        sf[4] = sf[4] * p.B_scale_f
+        sr[4] = sr[4] * p.B_scale_r
+        x = substep(x, u_s, u_l, p, sf, sr, dt)
+    state[i] = x
+    qc = project_local(track_x, track_y, tid, npts, ds, x[0], x[1], hints[i, 0])
+    hints[i, 0] = int(qc[2])
+    hints[i, 1] = hf
+    hints[i, 2] = hr
+    frenet[i, 0] = qc[0]
+    frenet[i, 1] = qc[1]
+    axle_mu[i, 0] = sf[0]
+    axle_mu[i, 1] = sr[0]
+
+
+class ScenarioSim(WarpSim):
+    """WarpSim whose per-axle surfaces come from each scenario's friction field along its track."""
+
+    def __init__(self, scenarios, params, tracks, device: str = "cpu"):
+        from sim.params import SURFACES
+        from scenarios.track import DS
+
+        n = len(scenarios)
+        super().__init__(n, params, device)
+        self.scenarios = scenarios
+        npts = max(len(t.s) for t in tracks)
+        tx = np.zeros((len(tracks), npts), np.float32)
+        ty = np.zeros((len(tracks), npts), np.float32)
+        for k, t in enumerate(tracks):
+            tx[k, : len(t.s)], ty[k, : len(t.s)] = t.x, t.y
+        self.track_x = wp.array(tx, dtype=wp.float32, device=device)
+        self.track_y = wp.array(ty, dtype=wp.float32, device=device)
+        self.track_n = wp.array(np.array([len(t.s) for t in tracks], np.int32), dtype=int, device=device)
+        self.ds = DS
+        names = ["dry", "wet", "snow", "ice"]
+        self.base = wp.array(np.stack([surface_vec(SURFACES[k]) for k in names]), dtype=vec8, device=device)
+        prof = np.array([[sc.s_drop, sc.transition, sc.patch_len, sc.mu0, sc.mu1, names.index(sc.surface), 0, 0]
+                         for sc in scenarios], np.float32)
+        self.prof = wp.array(prof, dtype=vec8, device=device)
+        self.track_id = wp.array(np.array([sc.track_id for sc in scenarios], np.int32), dtype=int, device=device)
+        self.hints = wp.zeros((n, 3), dtype=int, device=device)
+        self.frenet = wp.zeros((n, 2), dtype=wp.float32, device=device)
+        self.axle_mu = wp.zeros((n, 2), dtype=wp.float32, device=device)
+
+    def reset_at_start(self, p_list=None):
+        """Straight-line steady state at each scenario's v0, at s = 0 on its track (heading 0)."""
+        from sim.reference import ReferenceSim
+
+        plist = p_list or [None] * self.n
+        x0 = np.stack([ReferenceSim.steady_state(sc.v0, VehicleParams() if pp is None else pp)
+                       for sc, pp in zip(self.scenarios, plist)])
+        self.reset(x0)
+        self.hints.zero_()
+
+    def step(self, actions) -> None:
+        if isinstance(actions, wp.array):
+            self.actions = actions
+        else:
+            a = np.ascontiguousarray(np.broadcast_to(np.asarray(actions, np.float32), (self.n, 2)))
+            self.actions.assign(wp.array(a, dtype=wp.float32, device=self.device))
+        wp.launch(step_field_kernel, dim=self.n,
+                  inputs=[self.params, self.state, self.buf, self.actions, self.track_id, self.track_x, self.track_y,
+                          self.track_n, self.ds, self.prof, self.base, self.hints, self.frenet, self.axle_mu,
+                          N_SUBSTEPS, CONTROL_DT / N_SUBSTEPS],
+                  device=self.device)
+
+    def get_frenet(self) -> np.ndarray:
+        return self.frenet.numpy().astype(np.float64)
+
+    def get_axle_mu(self) -> np.ndarray:
+        return self.axle_mu.numpy().astype(np.float64)

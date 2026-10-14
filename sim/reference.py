@@ -43,17 +43,22 @@ def tire(kappa: float, alpha: float, Fz: float, s: Surface, combined_alpha: floa
     D = s.mu * Fz
     sn = math.hypot(sx, sy)
     if sn > S_EPS:
-        F = _mf(sn, s.B, s.C, D, s.E)
-        fx, fy = F * sx / sn, F * sy / sn
+        fx = _mf(sn, s.Bx, s.Cx, D, s.Ex) * sx / sn
+        fy = _mf(sn, s.By, s.Cy, D, s.Ey) * sy / sn
     else:
         fx, fy = 0.0, 0.0
     if combined_alpha != 0.0:
-        fx_e = _mf(sx, s.B, s.C, D, s.E)
+        fx_e = _mf(sx, s.Bx, s.Cx, D, s.Ex)
         ratio = fx_e / D if D > 0 else 0.0
-        fy_e = _mf(math.tan(a), s.B, s.C, D, s.E) * math.sqrt(min(max(1.0 - ratio * ratio, 0.0), 1.0))
+        fy_e = _mf(math.tan(a), s.By, s.Cy, D, s.Ey) * math.sqrt(min(max(1.0 - ratio * ratio, 0.0), 1.0))
         w = combined_alpha
         fx, fy = (1 - w) * fx + w * fx_e, (1 - w) * fy + w * fy_e
     return fx, fy
+
+
+def scaled_surfaces(sf: Surface, sr: Surface, p: VehicleParams) -> tuple[Surface, Surface]:
+    """Apply the per-axle cornering-stiffness scales (lateral B only)."""
+    return replace(sf, By=sf.By * p.B_scale_f), replace(sr, By=sr.By * p.B_scale_r)
 
 
 def slip_ratio(R: float, omega: float, vx_wheel: float, eps_v: float) -> float:
@@ -182,9 +187,8 @@ class ReferenceSim:
         return x
 
     def step(self, action, sf: Surface, sr: Surface) -> np.ndarray:
-        # per-axle stiffness scaling acts on the surface B (substep() takes the effective surfaces)
-        sf = replace(sf, B=sf.B * self.p.B_scale_f)
-        sr = replace(sr, B=sr.B * self.p.B_scale_r)
+        # per-axle cornering-stiffness scaling acts on the lateral B (substep() takes the effective surfaces)
+        sf, sr = scaled_surfaces(sf, sr, self.p)
         self.buf[1:] = self.buf[:-1]
         self.buf[0] = action
         u = self.buf[self.p.delay_steps]

@@ -14,12 +14,12 @@ Uses the NumPy reference tire, so it follows exactly the same force model as the
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 
 import numpy as np
 
 from sim.params import G, RHO_AIR, Surface, VehicleParams
-from sim.reference import IAACT, IDELTA, IPSI, IR, IVX, IVY, IWF, IWR, NX, tire
+from sim.reference import IAACT, IDELTA, IPSI, IR, IVX, IVY, IWF, IWR, NX, scaled_surfaces, tire
 
 
 @dataclass
@@ -56,8 +56,7 @@ def solve_turn(vx: float, R: float, p: VehicleParams, sf: Surface, sr: Surface |
                tol: float = 1e-10, iters: int = 200) -> Equilibrium:
     """Find the steady turn at speed vx on radius R (left turn for R > 0). Surfaces get the per-axle B scale."""
     sr = sf if sr is None else sr
-    sf = replace(sf, B=sf.B * p.B_scale_f)
-    sr = replace(sr, B=sr.B * p.B_scale_r)
+    sf, sr = scaled_surfaces(sf, sr, p)
     L = p.lf + p.lr
     z = np.array([0.0, L / R, 0.0])
     # start from the linear-tire solution to land in the right (pre-peak) basin

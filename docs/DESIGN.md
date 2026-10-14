@@ -33,9 +33,12 @@ plough), and (b) offer *structural* mismatch axes for H2.
 - **Tire forces:** Pacejka Magic Formula per axle, `F = D·sin(C·atan(Bs − E(Bs − atan(Bs))))`, with `D = μ·Fz`.
   **Combined slip** by the normalized slip-vector method (σx = κ/(1+κ), σy = tan α/(1+κ), σ = ‖σ‖, force direction
   along σ, magnitude MF(σ)). Mismatch variant: friction-ellipse scaling of pure-slip curves.
-- **Surface-dependent shape**, not only μ. Each surface has its own (B, C, D=μ, E). Initial values come from the
-  widely quoted "typical MF coefficients" table: dry (10, 1.9, 1.0, 0.97), wet (12, 2.3, 0.82, 1.0), snow
-  (5, 2.0, 0.3, 1.0), ice (4, 2.0, 0.1, 1.0). ⚠ Find and cite a primary source in P1. The surface is sampled per axle.
+- **Surface-dependent shape**, not only μ, with separate longitudinal (Bx, Cx, Ex) and lateral (By, Cy, Ey) curves
+  per surface, peak D = μ·Fz (D15; values and sources in `sim/params.py`). Longitudinal shapes are fitted to the
+  Burckhardt μ-slip curves; lateral shapes follow Pacejka's typical C ≈ 1.3 (dry/wet) and CRREL winter
+  measurements (ice peak ≈ 3°, snow rising to ≈ 15°). Combined slip: Fx = (σx/σ)Fx0(σ), Fy = (σy/σ)Fy0(σ).
+  The original single-curve "typical MF coefficients" table (MathWorks) was longitudinal-only and is superseded.
+  The surface is sampled per axle.
 - **Tire relaxation** (mismatch axis): `dFy_lag/dt = (|vx|/σ_relax)(Fy − Fy_lag)`, with σ_relax ∈ {0 (off), 0.3–0.6 m}.
 - **Body:** planar rigid body with `Fxf, Fyf` rotated by δ; rolling resistance `f_rr·Fz`; aero drag `½ρCdA·vx|vx|`.
 - **Wheels:** `Jw·ω̇ = T_drive_axle − T_brake_axle − R·Fx − b·ω`. Brakes cannot reverse wheel direction
@@ -71,6 +74,13 @@ plough), and (b) offer *structural* mismatch axes for H2.
   jumps). Lane width **3.5 m**; the reference is the lane centre.
 - The friction field is defined along the path, `μ(s)` with an optional lateral band, and sampled at each axle's
   projected `s`. The front axle meets a patch `L/v` before the rear.
+- **Implemented layout (P1, `scenarios/track.py`):** five shared tracks: a 600 m straight, and for each
+  R ∈ {50, 100, 200, 400} m: 70 m lead-in straight → clothoid (length R/3 clipped to [15, 80] m) → arc → clothoid →
+  350 m exit straight, turning 90° in total (left). Tables at 0.25 m. Drop locations: entry = clothoid start,
+  apex = arc middle, exit = arc end, straight = 70 m. Each axle is projected onto the track every 1 ms substep
+  (local search), and its surface is the friction-field blend at that s (`scenarios/friction.py`): μ and the curve
+  shape are interpolated linearly across ramps, so |F| ≤ μ·Fz still holds. The episode starts at s = 0 in
+  straight-line steady state at v0. These constants are written into the header of every generated scenario file.
 
 ### 3.2 Scenario parameters (sampled; strata define reporting cells)
 | Factor | Range / levels (initial) |

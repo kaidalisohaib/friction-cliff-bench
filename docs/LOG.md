@@ -12,6 +12,15 @@ Format per entry: date, phase, hours, what was done, and the verdict for any run
 _(starts in P2)_
 
 ## Entries
+- **2026-10-14 (P1, simulator core):** Built and tested `sim/` (tire, NumPy reference, Warp sim, steady-turn
+  solver). Gates green: V1, V2 (reformulated), V3, V4/S4, V5, V6 (1e8 GPU env-steps, no NaN), V7, V8 (Warp vs
+  reference ~1e-4 m over 2 s). Findings: (1) equal tire coefficients make the car exactly neutral-steer → per-axle
+  stiffness scales; (2) the DESIGN MF table is longitudinal-only and put the ice lateral peak at ~21° → D15
+  re-sourcing (Burckhardt + CRREL + Pacejka); (3) cornering drag and rolling resistance consume rear (drive)
+  grip, so the steady RWD limit is below √(μgR), most on low-μ surfaces; (4) my first V5 hand calc assumed the
+  iced axle jumps to its peak force; it stays on the linear part of the ice curve (sim matched the corrected
+  calc). V2 now = (a) no steady turn above √(μgR) [soundness], (b) dry/wet within 3%, (c) snow/ice reported,
+  (d) closed-loop dry circle.
 - **2026-10-14 (G0 passed):** Tagged and pushed `prereg-v1` (at `d640081`). Env verified, no prior head-to-head
   found, prereg frozen. From now on the prereg changes only through dated amendments. P0 complete; next is P1.
 - **2026-10-14 (P0, prereg values approved):** Approved the remaining proposals (tuning budget, marginal and

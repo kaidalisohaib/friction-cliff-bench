@@ -47,11 +47,12 @@ class VehicleParams:
     brake_front_frac: float = 0.65
     drive_front_frac: float = RWD  # prereg V8: RWD
     delay_steps: int = 1  # pure action delay in control steps (nominal 20 ms)
-    # per-axle cornering-stiffness scale on the surface B (1.0 = DESIGN.md). With equal tire coefficients
-    # a bicycle model is exactly neutral-steer (C_alpha ~ Fz ~ the other axle's lever arm); real sedans
-    # understeer, so the G1 parameter freeze (D13) must pick B_scale_r > B_scale_f from data (comma, P5).
-    B_scale_f: float = 1.0
-    B_scale_r: float = 1.0
+    # per-axle scale on the *lateral* B (effective axle cornering stiffness, lumping roll/compliance effects).
+    # With equal tire coefficients a bicycle model is exactly neutral-steer (C_alpha ~ Fz ~ the other axle's
+    # lever arm). 0.80 / 1.52 give an understeer gradient of ~2.0 deg/g on dry (typical passenger cars:
+    # ~2-3 deg/g at the road wheel); checked against real data (comma) in P5. D15.
+    B_scale_f: float = 0.80
+    B_scale_r: float = 1.52
     # resistances
     f_rr: float = 0.012  # rolling resistance coefficient
     CdA: float = 0.7  # drag area [m^2]
@@ -79,23 +80,35 @@ class VehicleParams:
 
 @dataclass(frozen=True)
 class Surface:
-    """Magic Formula shape per surface: D = mu * Fz (DESIGN.md §2.2, D11)."""
+    """Magic Formula shapes per surface (D11): separate longitudinal (x) and lateral (y) curves, D = mu * Fz.
+
+    Sources (P1 parameter sourcing, D15):
+    - longitudinal (Bx, Cx, Ex): least-squares fit of the MF shape to the Burckhardt mu-slip curve of that
+      surface (Burckhardt 1993; scripts/fit_surfaces.py), normalized to its own peak.
+    - lateral (By, Cy, Ey): dry/wet use Pacejka's typical lateral shape factor C = 1.3, a cornering-stiffness
+      coefficient C_alpha/Fz = 17 /rad at the nominal mu, and peak slip angles of 7 deg (dry) / 6 deg (wet);
+      snow/ice follow CRREL winter-surface slip-angle measurements (ice: peak at 2-4 deg, then a marked
+      drop -> C = 1.6, peak at 3 deg; snow: rises towards a maximum up to ~15 deg -> C = 1.0, 90% at 10 deg).
+    - mu: peak friction; sampled per scenario from MU_RANGES (prereg V7); the value here is nominal.
+    """
 
     name: str
-    B: float
-    C: float
     mu: float
-    E: float
+    Bx: float
+    Cx: float
+    Ex: float
+    By: float
+    Cy: float
+    Ey: float
 
     def with_mu(self, mu: float) -> "Surface":
         return replace(self, mu=mu)
 
 
-# Initial "typical MF coefficients" (DESIGN.md §2.2; primary source to be cited in P1, D13).
-DRY = Surface("dry", 10.0, 1.9, 1.0, 0.97)
-WET = Surface("wet", 12.0, 2.3, 0.82, 1.0)
-SNOW = Surface("snow", 5.0, 2.0, 0.3, 1.0)
-ICE = Surface("ice", 4.0, 2.0, 0.1, 1.0)
+DRY = Surface("dry", 1.0, 13.071, 1.526, 0.715, 13.077, 1.3, -1.742)
+WET = Surface("wet", 0.82, 18.197, 1.529, 0.742, 15.947, 1.3, -1.493)
+SNOW = Surface("snow", 0.3, 52.745, 1.485, 0.870, 11.710, 1.0, 0.0)
+ICE = Surface("ice", 0.1, 150.150, 1.611, 1.000, 28.557, 1.6, 0.0)
 SURFACES = {s.name: s for s in (DRY, WET, SNOW, ICE)}
 
 # Sampling ranges of the post-drop mu (prereg V7).
