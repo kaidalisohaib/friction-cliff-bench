@@ -150,8 +150,9 @@ def substep(x: np.ndarray, u_steer: float, u_long: float, p: VehicleParams, sf: 
     dvx = SFx / p.m + r * vy
     dvy_dyn = SFy / p.m - r * vx
     dr_dyn = Mz / p.Iz
-    # low-speed blend to a kinematic bicycle; weight is exactly 1 above v_hi (certificate needs this)
-    wgt = smoothstep((abs(vx) - p.v_lo) / (p.v_hi - p.v_lo))
+    # low-speed blend to a kinematic bicycle on the *speed* |v| (not |vx|: a car sliding sideways is not slow);
+    # the weight is exactly 1 above v_hi, which the feasibility certificate relies on
+    wgt = smoothstep((math.hypot(vx, vy) - p.v_lo) / (p.v_hi - p.v_lo))
     r_kin = vx * math.tan(delta) / L
     vy_kin = p.lr * r_kin
     dvy = wgt * dvy_dyn + (1.0 - wgt) * (vy_kin - vy) / p.tau_kin

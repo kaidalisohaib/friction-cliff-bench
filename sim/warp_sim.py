@@ -209,7 +209,7 @@ def substep(x: vec13, u_steer: wp.float32, u_long: wp.float32, p: Params, sf: ve
     dvx = SFx / p.m + r * vy
     dvy_dyn = SFy / p.m - r * vx
     dr_dyn = Mz / p.Iz
-    wgt = smoothstep((wp.abs(vx) - p.v_lo) / (p.v_hi - p.v_lo))
+    wgt = smoothstep((wp.sqrt(vx * vx + vy * vy) - p.v_lo) / (p.v_hi - p.v_lo))
     r_kin = vx * wp.tan(delta) / L
     vy_kin = p.lr * r_kin
     dvy = wgt * dvy_dyn + (one - wgt) * (vy_kin - vy) / p.tau_kin

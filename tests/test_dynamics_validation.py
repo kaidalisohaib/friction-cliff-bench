@@ -180,6 +180,17 @@ def test_v5_mu_step_transients(which):
         assert abs(x[IR]) < 0.5 * abs(r0) and abs(beta) < np.radians(3)
 
 
+def test_sideways_slide_is_not_treated_as_low_speed():
+    """A car sliding sideways at 15 m/s (vx = 0) must decelerate at no more than friction allows
+    (|a| <= mu g + resistances), not be stopped by the low-speed kinematic blend."""
+    x0 = np.zeros(NX)
+    x0[IVY] = 15.0
+    ref = ReferenceSim(P, x0)
+    ref.step([0.0, 0.0], DRY, DRY)
+    dv = np.hypot(ref.x[IVX], ref.x[IVY]) - 15.0
+    assert abs(dv) / DT <= DRY.mu * G * 1.05 + 0.5
+
+
 # --- V6 ------------------------------------------------------------------------------------------------
 def abuse_run(n_env, n_steps, device, seed=0):
     """Random actions incl. full-lock steering, wheel lock, reverse, deep slides on random per-axle

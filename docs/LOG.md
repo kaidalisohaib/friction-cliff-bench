@@ -12,6 +12,16 @@ Format per entry: date, phase, hours, what was done, and the verdict for any run
 _(starts in P2)_
 
 ## Entries
+- **2026-10-14 (P1, scenarios + certificate):** Tracks (5 shared, clothoid–arc–clothoid 90° curves), Frenet
+  projection, per-axle per-substep friction field, prereg V7 sampler (deterministic, canonical JSONL; SHA not yet
+  recorded). Analytic certificate v1 (arc drops, arrival-state based) with the soundness argument written in
+  FEASIBILITY §2.1 before any labelling. Prediction: the classic cell (15 m/s, R 50, ice, continuing arc) is
+  certified → **confirmed**. Checks: never certifies when circling is possible; Monte Carlo point-mass never beats
+  the bound; brute-force point-mass never survives a certified case; full sim leaves the lane in certified cases.
+  Measured conservatism: brute-force point mass fails 30–40% below the certified speed (that band = undetermined).
+  On the real 90° tracks only apex drops get certified (exit: arc too short; entry: not covered yet). Fixed a
+  realism bug: low-speed blend keyed on |vx| (a sideways slide counted as "slow"); now |v|. D16 (arrival-state
+  semantics for labels and S1) proposed, OPEN.
 - **2026-10-14 (P1, simulator core):** Built and tested `sim/` (tire, NumPy reference, Warp sim, steady-turn
   solver). Gates green: V1, V2 (reformulated), V3, V4/S4, V5, V6 (1e8 GPU env-steps, no NaN), V7, V8 (Warp vs
   reference ~1e-4 m over 2 s). Findings: (1) equal tire coefficients make the car exactly neutral-steer → per-axle

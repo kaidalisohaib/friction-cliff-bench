@@ -92,3 +92,8 @@ coefficients on both axles a bicycle model is exactly neutral-steer. Changes:
    deg/g); to be sanity-checked on comma data in P5.
 Consequences: dry/wet steady cornering limit within 3% of sqrt(mu g R) (V2b); ice now ~0.96, snow ~0.92 (by
 design: snow lateral force approaches its peak only at large angles). Sources still to strengthen: primary CRREL report text, a published lateral MF parameter set for a passenger tire.
+
+## D16: Certificate labels use the arrival state; S1 checked per run at the actual arrival state. OPEN (proposed 2026-10-14)
+See `FEASIBILITY.md` §2.2. Needed because a clairvoyant oracle can pre-brake and arrive slower than the reference
+speed, so "no oracle succeeds in a certified-infeasible scenario" is not the right test for an arrival-state
+certificate. Requires a dated prereg amendment (S1 wording) before any test-split labelling.

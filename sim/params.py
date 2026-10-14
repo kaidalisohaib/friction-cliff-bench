@@ -60,8 +60,8 @@ class VehicleParams:
     sigma_relax: float = 0.0  # tire relaxation length [m]; 0 = off (nominal)
     combined_alpha: float = 0.0  # 0 = slip-vector combined slip (nominal), 1 = friction ellipse
     # numerics
-    v_lo: float = 0.5  # below: kinematic bicycle [m/s]
-    v_hi: float = 2.0  # above: fully dynamic model [m/s]
+    v_lo: float = 0.5  # speed |v| below which the model is a kinematic bicycle [m/s]
+    v_hi: float = 2.0  # speed |v| above which the model is fully dynamic (blend weight exactly 1) [m/s]
     tau_kin: float = 0.05  # relaxation time towards kinematic vy, r at low speed [s]
     eps_v: float = 0.1  # floor on slip-ratio denominator [m/s]
 

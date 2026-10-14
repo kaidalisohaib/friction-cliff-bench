@@ -44,6 +44,73 @@ infeasibility but never feasibility.
 Requirement: every certificate method has a written soundness argument in this file *before* any scenario is
 labelled infeasible with it.
 
+### 2.1 Implemented certificate v1 (P1): statement and soundness argument
+Code: `feasibility/certificate.py` (`certify_arc`, `certify_scenario`). Tests: `tests/test_certificate.py`.
+
+**Claim.** Consider a friction drop on a constant-radius arc R. At t = 0 the front axle reaches the start of the
+transition with speed v_a, lateral offset |e| ≤ e0, lateral velocity |ė| ≤ ė0. If `certify_arc` returns
+certified, then **every** trajectory of the simulator (any controller, any information) has a footprint corner
+beyond the lane edge at some 20 ms lane-check instant before the low-friction window ends.
+
+**Facts about the simulator used (each enforced in code and tested):**
+1. Each axle force satisfies |F_i| ≤ μ_i·Fz_i: the tire curves peak at D = μ·Fz (V4/S4), the applied force is
+   clipped to the friction circle after tire relaxation, and friction-field ramps blend μ and shape linearly.
+2. Fzf + Fzr = m·g exactly (the longitudinal load transfer clamps the acceleration, not the loads).
+3. Other horizontal forces: rolling resistance ≤ f_rr·m·g, drag ≤ ½ρC_dA·v².
+4. Above |v| = v_hi the low-speed kinematic blend has weight exactly 1 (smoothstep on the *speed*).
+5. Semi-implicit Euler: velocity changes are impulses at the old position; between impulses the CoG moves in a
+   straight line.
+Hence the CoG acceleration obeys |a| ≤ A(t) = μ_max(t)·g + f_rr·g + ½ρC_dA·v_ub²/m, with μ_max(t) ≤ μ0 always and
+≤ μ1 while both axles are on the patch.
+
+**Geometry.** No footprint corner is beyond the edge only if the CoG lateral deviation is ≤ w = 1.75 − W/2: the
+disc of radius W/2 around the CoG lies inside the footprint rectangle (the CoG is ≥ W/2 from every edge), so a
+CoG deviation > w puts a footprint point, hence a corner, beyond the edge. On the arc the CoG corridor is the
+annulus R − w ≤ r ≤ R + w around the arc centre.
+
+**Dynamics bound.** In polar coordinates around the arc centre, with h = r²θ̇: r̈ = h²/r³ + a_r and
+ḣ = r·a_θ (exact for the continuous motion; for straight-line motion between impulses r̈ = h²/r³ and h is constant;
+an impulse changes ṙ by ≥ −A·dt and h by ≥ −r·A·dt). Suppose the CoG stays in the annulus on [0, T]. Then
+h(t) ≥ h_lb(t) = h0 − (R + w)∫A and r̈ ≥ g(t) = max(h_lb, 0)²/(R + w)³ − A(t), so ρ = r − R ≥ ρ_lb(t) =
+ρ0 + ρ̇0·t + ∬g with ρ0 = −e0, ρ̇0 = −ė0, h0 = (R − e0)·√(v_a² − ė0²) (the worst case for the car), each reduced by
+one extra physics step of worst-case change (discretization). ρ_lb is a piecewise polynomial computed in closed
+form.
+
+**Phases.** A = A(μ0) until the rear axle is surely past the entry ramp (CoG progress ≥ L + lt + 0.1 m; rear-axle
+s ≥ CoG s − lr whatever the heading); progress has the lower bound R·∫h_lb/(R + w)² (θ̇ = h/r²). After that,
+A = A(μ1). The window ends when the front axle could reach the exit ramp or the CoG could leave the arc
+(progress ≤ R·∫h_ub/(R − w)², h_ub = (R + w)(v_a + ∫A)).
+
+**Decision.** Certified if at some grid time t*: ρ_lb(t*) > w + 1 mm, ρ̇_lb(t*) ≥ 0, g ≥ 0 on [t*, t* + 20 ms] (so
+ρ_lb stays above w until the next lane check), t* + 20 ms is inside the window, the speed lower bound
+v_a − ∫A stays ≥ v_hi (fact 4 applies) and the speed upper bound stays within the drag headroom used in A.
+This contradicts "stays in the annulus on [0, T]", so a lane-check instant with a corner beyond the edge exists.
+
+**Scope (v1).** Arcs only, with the CoG already on the arc at arrival (apex and exit drops). Straight drops are
+never infeasible for the point mass (brake in a straight line). Entry drops (clothoid) are not covered yet; they
+are labelled by the oracles or stay *undetermined*.
+
+**Conservatism (measured, not a result).** The bound lets the car brake and turn with the full budget at once.
+A brute-force point-mass search (`feasibility/pointmass.py`) fails at arrival speeds about 30–40% below the
+certified threshold, so arrival speeds in that band are *undetermined*, not certified. Possible tightening
+(future): bound the yaw angle in the dry phase to use per-axle grip; a coupled-budget Lyapunov bound; HJ
+reachability.
+
+**Checks in the test suite:** the G1 classic cell is certified; never certified when steady circling is possible;
+monotone in speed; Monte Carlo random point-mass trajectories never beat ρ_lb; the point-mass search never
+survives a certified case; the full simulator with strong heuristic controllers leaves the lane in certified
+cases while being in lane at arrival (S1 preview).
+
+### 2.2 What "arrival state" means for labels and S1 (OPEN, D16; needs a prereg amendment)
+The certificate is a function of the arrival state. A clairvoyant controller may brake *before* the patch and
+arrive slower, so a scenario certified at the nominal arrival state (v0, on the centreline) can still be
+survived by O-C. Proposed: (a) label *certified-infeasible* = the certificate holds at the nominal arrival state
+(i.e. "nothing can save a car that arrives at the reference speed without having seen the patch"; a certified
+form of reactive infeasibility); (b) check S1 per oracle run at that run's *actual* logged arrival state
+(speed, |e|, |ė|), which is sharp and sound for both oracles; (c) O-C successes in certified scenarios are
+expected (pre-braking) and are reported, not treated as bugs. The prereg's S1 wording ("no oracle succeeds in a
+certified-infeasible scenario") would be refined by a dated amendment before any test-split labelling.
+
 ## 3. Layer 2: constructive oracles (feasibility witnesses)
 - **Reactive oracle:** MPPI with the *exact* truth simulator as its rollout model and the true *current* per-axle
   μ + surface, held constant over its horizon (it does not know what is ahead).
