@@ -5,8 +5,8 @@ Own code: license ⚠ (MIT suggested), decided before going public (`DECISIONS.m
 
 | Resource | Use here | License / terms | Notes |
 |---|---|---|---|
-| NVIDIA Warp (`warp-lang`) | Simulator, reference MPPI | ⚠ check the current license at install | Verify every API against the installed version |
-| PyTorch (CUDA ≥ 12.8 build) | PPO, estimators | BSD-style | RTX 5090 Laptop = sm_120 needs CUDA 12.8+ wheels |
+| NVIDIA Warp (`warp-lang`) 1.18.0 | Simulator, reference MPPI | **Apache-2.0** (checked at install, 2026-10-14) | Verify every API against the installed version |
+| PyTorch 2.14.1+cu130 | PPO, estimators | BSD-3 core; wheel metadata lists Apache-2.0/BSD/MIT/BSL components | RTX 5090 Laptop = sm_120 needs CUDA 12.8+ wheels |
 | rsl-rl-lib | PPO | BSD-3 (check) | Pin the version |
 | Optuna | Tuning harness | MIT | — |
 | CUDA, CMake, GoogleTest, nanobind/pybind11 | C++ MPPI | permissive | — |
@@ -14,8 +14,8 @@ Own code: license ⚠ (MIT suggested), decided before going public (`DECISIONS.m
 | **MCity-WSPI winter physics** (HF `AD-Assurance-Lab/winter-driving-dataset`; GitHub `AD-Assurance-Lab/dataset--winter-driving--main`) | P5: μ ranges and transition sharpness from MARWIS; E5 stretch | **CC-BY-4.0** (HF card); cite Tye et al., "MI-Snow1000", SAE Int. J. CAV 9(2), 2026 | ~85 GB; new repo (Jun 2026), inconsistent names; 25 Hz nearest-neighbour resampling; wheel speeds in rad/s; MARWIS = optical road-sensor proxy, **not** tire μ; download a subset only |
 | comma2k19 | Optional CAN wheel speeds | MIT | Old tooling (Py 2.7/3.6) |
 | comma `controls_challenge` | Reference only | **No license file**, so link, don't copy | Archived |
-| INI `f1tenth_development_gym` (jax_pacejka) | V8 cross-check reference | ⚠ check in P0 | Don't vendor until checked |
+| INI `f1tenth_development_gym` (jax_pacejka), github.com/F1Tenth-INI/f1tenth_development_gym @ `6a8a3d4` (2026-08-28) | V8: *optional* partial cross-check of the pure-lateral subset only | Top level **MIT** (copyright inherited from the f1tenth_gym authors); vendored `utilities/minimum_curvature_optimization` is **LGPL-3.0**; submodules `SensorsINI/SI_Toolkit` and `SensorsINI/Control_Toolkit` have **no license** (all rights reserved) | **Checked 2026-10-14.** Runs on CPU JAX (Py 3.11, `jax[cpu]==0.4.38`, PYTHONPATH setup, no TF needed). Its own JAX-vs-ODE_TF parity tests (`test_ode_tf_vs_jax_pacejka.py`) **fail 3/3 at HEAD** under default Settings. Model is **lateral-only** MF (μ·Fz·D·sin…), no combined slip, no wheel-spin states; longitudinal = commanded acceleration clipped to μg; 1:10 params. **Verdict:** weak V8 reference. Use our scalar NumPy reference as the primary V8; at most call jax_pacejka as an external black box for the pure-lateral subset. Never vendor (LGPL + unlicensed submodules). |
 | RoboRacer `f1tenth_gym` dev-jax | Possible upstream contribution (friction fields) | MIT | 1:10 scale |
-| LLA-MPC repo (DRIVE-LAB-CMU) | Reference for M-B | ⚠ check in P0; does it run? 4 h timebox | Reimplement natively if blocked |
+| LLA-MPC repo, github.com/DRIVE-LAB-CMU/LLA-MPC @ `dfe09e9` (2026-02-17) | Reference for M-B (algorithm only) | **MIT** (LICENSE.md copyright "2020 Achin Jain": inherited from the BayesRace codebase it forks; keep that notice if any code is ever reused) | **Checked 2026-10-14. Runs.** README pins Py 3.6 + 2020-era deps (casadi 3.5.1, pandas 1.0.3); ran instead in its own venv with Py 3.10 + casadi 3.8.1, numpy 2.2, LaTeX and video disabled in a patched copy of `run_nmpc_orca_llampc_rt.py`. Full 36 s closed-loop sudden-drop run completed (1:43 car, default bank N = 5000, not the paper's 20k; CPU NumPy, not the JAX version the README says performs best); only a final colorbar call fails (newer matplotlib). μ̂ visibly follows the step. **Do not run `fixros.py`** (it calls `sudo dpkg -r --force-all`). **Verdict:** reimplement M-B natively in Warp (planned anyway); use the repo to cross-check selection logic (Eq. 5–7: argmin of summed one-step squared error over W). |
 | BeamNG.tech | Stretch: out-of-family truth sim | Academic, non-commercial | Publish own code/results only |
 | RACECAR (IAC), CADC | **Avoid** | CC BY-NC 4.0 | RACECAR also lacks wheel/steering channels |

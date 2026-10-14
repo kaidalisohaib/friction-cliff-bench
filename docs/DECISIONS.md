@@ -54,3 +54,25 @@ Options: public at G2 (Nov 30) if citing it on summer-2027 applications, otherwi
 ## D11: Surface changes tire *shape*, not only μ. DECIDED 2026-10-14
 Each surface has its own (B, C, D = μ, E). Why: real ice/snow change the slip curve's shape. A μ-only model would
 make model-bank MPPI artificially well-specified.
+
+## D12: V8 cross-check uses our own scalar NumPy reference; jax_pacejka is optional and partial. DECIDED 2026-10-14
+Supersedes the P1 task wording "vs jax_pacejka (or a scalar NumPy reference if the license blocks it)". The license
+does not block it (top-level MIT), but the P0 check showed INI's jax_pacejka is a lateral-only Magic Formula with
+no combined slip and no wheel-spin states, and its own JAX-vs-ODE parity tests fail at HEAD `6a8a3d4`. So it cannot
+cross-check most of our model. V8 = an independent scalar NumPy implementation written from `DESIGN.md` §2 (not
+from the Warp code), compared on matched parameters. jax_pacejka may be called as an external black box for the
+pure-lateral subset only, and is never vendored (`DATA_AND_LICENSES.md`).
+
+## D13: Vehicle parameters are frozen at G1, not at the prereg tag. DECIDED 2026-10-14
+`prereg-v1` is still tagged at the end of P0 (hypotheses, metrics, statistics, budget, sampler spec, seeds). The
+`DESIGN.md` §2.3 parameters and the surface MF coefficients are justified with sources in P1 and frozen by one
+dated prereg amendment at G1, before any test-split scenario is labelled or evaluated. Why: the parameter research is
+P1 work, and freezing before any test-split use keeps the confirmatory analysis clean.
+
+## D14: Actuator delay stays in RL domain randomization; MPPI gets the same preparation. DECIDED 2026-10-14
+Conflict: RL DR randomized steering delay 0–40 ms, but delay is H2 mismatch axis 3, and H2 must test conditions
+neither side was prepared for. Options were (A) drop delay from DR, or (B) keep it and prepare the MPPI side
+equally. Chosen: **B**. RL DR uses extra actuator delay 0–40 ms on both channels; the M-B bank adds delay variants
+{0, 20, 40} ms; the M-L estimator also regresses the extra delay. H2 axis 3 moves to +{60, 100, 140} ms, beyond
+what either side has seen. Why: keeps the realistic robustness of DR without rigging H2 in RL's
+favour. Cost: M-B bank is ~3× larger. Supersedes the "remove delay from DR" proposal.

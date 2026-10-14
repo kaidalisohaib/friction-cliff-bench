@@ -1,0 +1,23 @@
+[project]
+name = "friction-cliff-bench"
+version = "0.0.0"
+description = "Feasibility-audited, parity-controlled benchmark of car control under sudden tire-road friction loss"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "numpy",
+    "torch",
+    "warp-lang",
+]
+
+[dependency-groups]
+dev = ["pytest"]
+
+# PyTorch CUDA build for the RTX 5090 Laptop (sm_120): needs CUDA >= 12.8 wheels.
+# cu130 matches the installed driver (580, CUDA 13.0).
+[tool.uv.sources]
+torch = { index = "pytorch-cu130" }
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true

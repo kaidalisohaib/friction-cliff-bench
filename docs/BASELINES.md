@@ -34,11 +34,11 @@
   For H2 mismatch tests, the rollout model stays in the *nominal family* while the truth changes.
 - Initial settings (tuned within budget): horizon 1.5–2.5 s, K = 1k–4k samples, temperature λ, noise Σ on (u_δ, u_a),
   warm start from the shifted previous plan, cost per `DESIGN.md` §4 + soft constraints for limits.
-- **M-B (bank):** a bank of candidate (surface params, μ) models spanning the DR range (LLA-MPC uses ~20k dynamic
+- **M-B (bank):** a bank of candidate (surface params, μ, extra actuator delay ∈ {0, 20, 40} ms) models spanning the DR range (D14) (LLA-MPC uses ~20k dynamic
   bicycle variants; start with ~50–200 and justify the size). Each step, score candidates by one-step prediction
   error over the look-back window W and pick the argmin (or a softmin mixture, ⚠ decide). MPPI uses the selected model.
-- **M-L (estimator):** a GRU trained offline (supervised, sim data under DR) to predict per-axle μ (+ surface class)
-  from the W-window history. MPPI uses μ̂.
+- **M-L (estimator):** a GRU trained offline (supervised, sim data under DR) to predict per-axle μ (+ surface class
+  + extra actuator delay, D14) from the W-window history. MPPI uses μ̂ and the estimated delay.
 - Oracles: same MPPI code with true information and the generous settings in `FEASIBILITY.md` §3.
 
 ## 4. RL arm (P3)
@@ -53,7 +53,8 @@
 - Curriculum: dry only → mild patches → full scenario distribution. Training scenarios are sampled from the
   *tuning-split sampler* only, never the test split.
 - DR (train): mass ±15%, Iz ±15%, CoG h ±10%, tire shape (B, C, E) ±15% within the surface family, μ within the
-  surface ranges, steering delay 0–40 ms, sensor noise/bias. **H2 mismatch axes are excluded from DR.**
+  surface ranges, extra actuator delay 0–40 ms on both channels (the M-B bank and M-L estimator cover the same
+  range, D14), sensor noise/bias. **H2 test levels lie outside the DR support** (axes 1–2 absent; delay only beyond 40 ms).
 
 ## 5. C++17/CUDA MPPI library (P4)
 - `mppi_cpp/include/vehicle.hpp`: `__host__ __device__` dynamics step, identical equations/params to the Warp sim

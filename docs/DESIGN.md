@@ -1,7 +1,8 @@
 # DESIGN: simulator, tracks, scenarios, shared task objective
 
 Status: **design spec, pre-implementation.** Parameter values are *initial*: they must be justified with a
-source (or a sanity check) in P1 and frozen before `prereg-v1`. Anything marked ⚠ is an open choice.
+source (or a sanity check) in P1 and frozen by a dated prereg amendment at G1, before any test-split
+labelling (D13). Anything marked ⚠ is an open choice.
 
 ---
 
@@ -108,5 +109,6 @@ plus a terminal/termination penalty `C_fail` on departure or loss of control.
   understeer. Signs and rough magnitudes checked against hand calculations.
 - **V6 robustness:** zero NaN/Inf over 1e8 random-action env-steps including vx → 0, reverse, wheel lock, and deep slides.
 - **V7 determinism/parity:** seeded GPU replay is bit-identical; CPU vs GPU trajectories agree within 1e-4 relative over 2 s.
-- **V8 cross-implementation:** vs jax_pacejka or the NumPy reference on matched parameters; document the error.
+- **V8 cross-implementation:** vs the independent scalar NumPy reference on matched parameters (D12; optional
+  pure-lateral comparison vs jax_pacejka); document the error.
 - Throughput is measured and logged but **not** a claimed result.

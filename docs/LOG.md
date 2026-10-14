@@ -6,11 +6,50 @@ Format per entry: date, phase, hours, what was done, and the verdict for any run
 | Week of | Phase | Hours | Running total |
 |---|---|---|---|
 | 2026-10-12 | planning | — | — |
+| 2026-10-12 | P0 | ≈ 4.5 | ≈ 4.5 |
 
 ## Tuning ledger (per method: trials, GPU-h, human-h)
 _(starts in P2)_
 
 ## Entries
+- **2026-10-14 (P0, decisions):** Approved the objective weights (prereg P1) and chose option B for the
+  delay conflict (D14: delay stays in RL DR, the MPPI bank/estimator cover the same 0–40 ms, H2 delay levels
+  +{60, 100, 140} ms). Remaining prereg proposals (P2–P8) still pending approval.
+- **2026-10-14 (P0, follow-up):** Downloaded the Poznań extended-abstract PDF; read in full. Confirmed: no MPC
+  baseline, no RMA baseline run, smooth (not abrupt) friction, multi-lap memory. Scoop verdict unchanged. I
+  approved the G1 parameter-freeze timing (D13).
+- **2026-10-14 (P0, prereg drafting):** Proposed values for every remaining ⚠ written into
+  `PREREGISTRATION.md` § "PROPOSED values" (objective weights, tuning budget, marginal and recovery bands, S2 margin,
+  H2 levels + test, test-split sampler spec + verifiable seeds, drivetrain, M-B argmin). Found two inconsistencies:
+  RL DR randomizes steering delay although delay is an H2 axis, and DESIGN says parameters are frozen "before
+  prereg-v1" but justified in P1. Fixes proposed. **Awaiting review; not tagged.**
+  Hours: ≈ 4.5 h equivalent (prior work ≈ 2.5, repos ≈ 1, env ≈ 0.5,
+  prereg ≈ 0.5).
+- **2026-10-14 (P0, timeboxed repo checks, ~1 h of the 4 h box):** Both cloned and run only under `~/p0_scratch/`,
+  each in its own venv. **LLA-MPC** (`dfe09e9`, MIT): runs with Py 3.10 + modern deps after disabling LaTeX/video;
+  the full sudden-drop closed-loop run completes (only a final plot call fails on new matplotlib). μ̂ follows
+  the step qualitatively. `fixros.py` runs `sudo dpkg -r`, never run it. **INI f1tenth_development_gym** (`6a8a3d4`,
+  MIT top level; LGPL-3.0 vendored utility; unlicensed submodules): imports and runs on CPU JAX, but its own
+  JAX-vs-ODE parity tests fail 3/3 at HEAD, and the model is lateral-only. Verdicts in `DATA_AND_LICENSES.md`;
+  consequence logged as D12 (V8 uses our own NumPy reference).
+- **2026-10-14 (P0, prior-work check):** Full texts read: LLA-MPC (2505.19512), AnyCar (2409.15783), Kalaria et al.
+  (2410.06565), OptCar (2607.13319, now CoRL 2026), plus LLA-MPPI (2610.10465, found in the search). Poznań
+  extended abstract located (XPlore @ ICRA 2026, OpenReview aSdoatNZc1) but only the abstract was readable (PDF
+  blocked to scripted access). Web + arXiv-API searches recorded in `RELATED_WORK.md`. Prediction: no RMA-class vs
+  adaptive-MPC head-to-head exists. **Verdict: confirmed, no head-to-head and no feasibility-labelled benchmark
+  found as of 2026-10-14.** No scoop; stay on the main plan. Watch: LLA group (now does MPPI-vs-DR-PPO on legged
+  robots) and the Poznań group. Open follow-ups: read the Poznań PDF in a browser; IEEE Xplore was
+  not queried directly.
+- **2026-10-14 (P0, env check):** `uv sync` → Python 3.12.13, torch 2.14.1+cu130 (arch list includes sm_120;
+  `cuda.is_available()` True; 4k×4k matmul OK), warp-lang 1.18.0 (Apache-2.0; bundles CUDA toolkit 13.4, driver
+  13.0). Warp saxpy kernel runs on `cpu` and `cuda:0` (CPU exact; GPU max abs err ~1e-6 vs NumPy, consistent with
+  FMA contraction; matters for V7 tolerance only at the 1e-6 level). `wp.from_torch`/`wp.to_torch` share memory.
+  **Trap confirmed on 1.18.0:** `wp.struct` field defaults (`m: float = 1600.0`) are silently ignored: a
+  default-constructed struct reads 0 on both CPU and GPU. Always set every field explicitly. CUDA/CMake: nvcc
+  13.3.73 (at `/usr/local/cuda/bin`, **not on PATH**; pass `-DCMAKE_CUDA_COMPILER` or add to PATH), CMake 3.28.3,
+  GCC 14.2.0. A hello-world saxpy built with `CMAKE_CUDA_ARCHITECTURES=120` gives native sm_120 SASS and runs
+  correctly (runtime 13.3 on driver 13.0). Verification scripts live outside the repo (`~/p0_scratch/`).
+  Verdict: env OK.
 - **2026-10-14:** Plan solidified. Docs: PLAN, DESIGN, FEASIBILITY, BASELINES, EVAL_PROTOCOL, PREREGISTRATION
   (draft), RELATED_WORK, DATA_AND_LICENSES. D1–D8, D10, D11 decided; D9 open. Next: P0 checklist.
 - **2026-10-13:** Project created (docs only) after a literature and design survey. Verdict on the original blueprint
