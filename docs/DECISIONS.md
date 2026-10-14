@@ -1,48 +1,56 @@
 # Decision log
 
-Dated entries. Never edit an old entry silently; supersede it with a new one.
-Status **PROPOSED (2026-10-13)** means pending. Change it to **DECIDED (date)** once approved.
+Dated entries. Never edit an old entry's substance; supersede it with a new dated entry.
+Statuses: **DECIDED (date)** or **OPEN**.
 
-## D1: Modify the original idea instead of replacing it. PROPOSED
-The original "extreme-dynamics slip-aware planner" (robotics-blueprint P2) keeps its question (learned vs
-model-based adaptation at sudden friction loss) and loses its headline ("RL beats MPC"). Ranked against a
-pure C++ MPPI project, PufferDrive self-play, and a kinematic→physics fidelity ladder, the modified version
-scored highest (report §"The modified original ranks first"). Its descope floor *is* the C++ MPPI project.
+## D1: Modify the original idea; don't replace it. DECIDED 2026-10-14
+The robotics-blueprint "P2 extreme-dynamics slip-aware planner" keeps its question (learned vs model-based
+adaptation at sudden friction loss) and drops its headline ("RL beats MPC"). Ranked against a pure C++ MPPI
+project (3.80), PufferDrive self-play (3.50), a kinematic→physics fidelity ladder (3.15), and the original as written
+(2.70), the modified version scored 4.30 (report §"The modified original ranks first"). Its descope floor *is* the
+C++ MPPI project. The old blueprint snippets are treated as nonexistent; everything is
+built from this spec.
 
-## D2: Fair baselines, not a strawman. PROPOSED
+## D2: Fair baselines, not a strawman. DECIDED 2026-10-14
 Constant-μ MPC is a context row only. The real baselines are bank-adaptive MPPI (LLA-MPC style) and
-learned-estimator MPPI, under matched information (same history window), a matched objective, and an
-equal logged tuning budget. Why: LLA-MPC already comes within ~0.07 s of a known-friction oracle after a
-40% friction drop.
+learned-estimator MPPI, with matched information, objective and tuning budget (`BASELINES.md`). Why: LLA-MPC
+already comes within ~0.07 s of a known-friction oracle after a 40% drop.
 
-## D3: Per-scenario feasibility labelling with oracles. PROPOSED
-Labels: certified-infeasible / preview-required / reactive-feasible / undetermined. They come from a
-friction-circle certificate plus reactive and clairvoyant oracle MPPI. Why: the original headline cell
-(μ = 0.1, 15 m/s, R = 50 m) is infeasible for any controller. The car crosses the half-lane in ~1.0 s, and
-slowing to √(μgR) ≈ 7 m/s would take ~90 m of straight braking.
+## D3: Per-scenario feasibility labelling with oracles. DECIDED 2026-10-14
+Labels: certified-infeasible / preview-required / reactive-feasible / undetermined (`FEASIBILITY.md`). Why: the
+original headline cell (μ = 0.1, 15 m/s, R = 50 m) is infeasible for any controller, and published oracles still
+show unexplained violations.
 
-## D4: Teacher sees current per-axle μ only. PROPOSED
-No friction preview for the teacher. Preview belongs to the clairvoyant oracle, which is used for labelling
-only. Tested explicitly as H3 (current-μ teacher vs preview teacher).
+## D4: Teacher sees current per-axle μ only. DECIDED 2026-10-14
+Preview belongs to the clairvoyant oracle (labelling only). The preview teacher is kept as the H3 ablation.
+Why: a proprioceptive student cannot infer friction it hasn't reached; a preview teacher teaches blanket caution.
 
-## D5: Pre-registered hypotheses replace target numbers. PROPOSED
-H1: on reactive-feasible, in-family scenarios, the RMA student does *not* beat the best adaptive MPPI by
-more than 5 pp (TOST equivalence). H2: under structural model mismatch, the regret curves cross. H3: as in D4.
-Falsifiers and statistics are in the report, and are finalized in `PREREGISTRATION.md` (tag `prereg-v1`).
+## D5: Pre-registered hypotheses replace target numbers. DECIDED 2026-10-14
+H1–H3 with falsifiers (`PREREGISTRATION.md`, tagged `prereg-v1` at the end of P0). No result numbers anywhere
+before the harness produces them.
 
-## D6: Build a small simulator in Warp; use the JAX gyms as references. PROPOSED
-Why: f1tenth_gym dev-jax and INI's jax_pacejka are 1:10 scale with no documented friction randomization,
-and they would put JAX next to P1's PyTorch stack. Warp passes data to PyTorch without copies and underpins
-Newton/Isaac Lab 3.0. The simulator is infrastructure, not a claimed contribution. Throughput is not a headline.
+## D6: Build a small simulator in Warp; JAX gyms are references only. DECIDED 2026-10-14
+Why: f1tenth_gym dev-jax and INI jax_pacejka are 1:10 scale with no documented friction randomization, and they
+would put JAX next to P1's PyTorch stack. Warp passes data to torch without copies and underpins Newton/Isaac Lab
+3.0. The simulator is infrastructure, not a claimed contribution, and throughput is not a headline.
 
-## D7: C++ goes into one load-bearing C++17/CUDA MPPI library, about 20% of hours. PROPOSED
-No ROS 2 node, no TensorRT, no C++ RL environment. Why: undergrad-eligible AV postings stress C++,
-planning/controls, MPPI, and validation, while RoboSub already demonstrates ROS 2/Jetson/Docker. The
-confirmatory sweeps run on the C++ library, so it carries real weight in the results.
+## D7: C++ purpose = CUDA + vehicle controls, in one load-bearing MPPI library. DECIDED 2026-10-14
+Supersedes the 2026-10-13 wording ("C++ is a gap"). I already had substantial C++/ROS 2 experience (AUV perception on
+Jetson). What was missing was CUDA backed by a project, optimal/sampling-based control, and car-domain work. So C++ goes into
+a C++17/CUDA MPPI library (~20% of hours) that the confirmatory sweeps run on. Out: ROS 2 node, TensorRT, C++ RL env.
 
-## D8: Full-size passenger-car parameters; 1:10 file kept for later. PROPOSED
-This matches the permissive real-data sources: commaSteeringControl (MIT) and MCity-WSPI winter runs
-(CC-BY-4.0). Cut from scope: heightmap, Bekker soil, and the CBF monitor (now a post-MVP extension).
+## D8: Full-size passenger car, flat ground; terramechanics cut. DECIDED 2026-10-14
+Cut: heightmap/grade, Bekker soil/terramechanics, CBF monitor (now a post-MVP stretch: a μ-adaptive safety
+filter). Why: off-road is a separate field (full-scale labs, Chrono-based sims that aren't GPU-batched), the
+question is fully answered on paved surfaces + ice/snow/wet, and bachelor's-level postings rarely mention
+terramechanics. Full-size parameters match the permissive real data (comma MIT, MCity-WSPI CC-BY-4.0).
 
-## D9: Repo stays private until G2 or the MVP; license TBD. PROPOSED
-Make it public at G2 (Nov 30) if citing it on summer-2027 applications, otherwise at the MVP.
+## D9: Public timing and code license. OPEN
+Options: public at G2 (Nov 30) if citing it on summer-2027 applications, otherwise at the MVP. License: MIT suggested.
+
+## D10: Own Python environment. DECIDED 2026-10-14
+`uv`, Python 3.12, a PyTorch CUDA ≥ 12.8 build, `warp-lang`, pinned `rsl-rl-lib`. Never symlink or reuse P1's IsaacLab venv.
+
+## D11: Surface changes tire *shape*, not only μ. DECIDED 2026-10-14
+Each surface has its own (B, C, D = μ, E). Why: real ice/snow change the slip curve's shape. A μ-only model would
+make model-bank MPPI artificially well-specified.
