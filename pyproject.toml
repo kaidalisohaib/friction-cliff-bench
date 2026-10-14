@@ -5,12 +5,16 @@ description = "Feasibility-audited, parity-controlled benchmark of car control u
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "numpy",
-    "torch",
     "warp-lang",
 ]
 
 [dependency-groups]
-dev = ["pytest"]
+dev = ["pytest", "matplotlib", "scipy"]
+# The RL / estimator arm (P3). Kept out of the core so CPU-only CI stays light.
+rl = ["torch"]
+
+[tool.uv]
+default-groups = ["dev", "rl"]
 
 # PyTorch CUDA build for the RTX 5090 Laptop (sm_120): needs CUDA >= 12.8 wheels.
 # cu130 matches the installed driver (580, CUDA 13.0).
@@ -21,3 +25,12 @@ torch = { index = "pytorch-cu130" }
 name = "pytorch-cu130"
 url = "https://download.pytorch.org/whl/cu130"
 explicit = true
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+markers = [
+    "slow: long-running (minutes); run with -m slow",
+    "gpu: needs a CUDA device; skipped automatically without one",
+]
+addopts = "-m 'not slow'"

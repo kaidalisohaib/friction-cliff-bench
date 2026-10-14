@@ -12,6 +12,8 @@ Format per entry: date, phase, hours, what was done, and the verdict for any run
 _(starts in P2)_
 
 ## Entries
+- **2026-10-14 (G0 passed):** Tagged and pushed `prereg-v1` (at `d640081`). Env verified, no prior head-to-head
+  found, prereg frozen. From now on the prereg changes only through dated amendments. P0 complete; next is P1.
 - **2026-10-14 (P0, prereg values approved):** Approved the remaining proposals (tuning budget, marginal and
   recovery bands, S2 margin, H2 levels + test rule, test-split spec + seeds, RWD, M-B argmin) after a detailed
   walkthrough. Values moved into a "Frozen values" section (V1–V8) and propagated to DESIGN, FEASIBILITY,

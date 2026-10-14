@@ -1,0 +1,15 @@
+name: ci
+on:
+  push:
+  pull_request:
+jobs:
+  tests-cpu:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      # CPU-only: skip the torch (rl) group; GPU tests are skipped automatically.
+      - run: uv sync --frozen --no-group rl
+      - run: uv run --no-group rl pytest -q
