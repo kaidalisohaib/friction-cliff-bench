@@ -8,7 +8,7 @@ a rate per feasibility class (headline: reactive-feasible).
 - *Adaptation regret* vs the reactive oracle O-R on the same scenario instance: Δ max |e_y|, Δ time out of lane,
   Δ progress over [t_drop, t_drop + 5 s].
 - *Recovery latency:* time from the first axle entering the patch until |e_y| and |r − r_ref| return to within a
-  band (⚠ fix in prereg) of O-R's trace, sustained 0.5 s. Censored at episode end.
+  band of O-R's trace (|Δe_y| ≤ 0.15 m and |Δr| ≤ 0.05 rad/s; prereg V4), sustained 0.5 s. Censored at episode end.
 - *Loss of control:* |β| > 20° or spin.
 - Peak |β|, peak |r − r_ref|, RMS jerk (comfort), μ-estimate error (M-B, M-L, latent probe for P-S).
 - Per-step compute latency (same GPU).

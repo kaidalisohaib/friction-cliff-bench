@@ -51,7 +51,7 @@ plough), and (b) offer *structural* mismatch axes for H2.
 | m | 1600 kg | Iz | 2700 kg·m² |
 | lf / lr | 1.25 / 1.45 m (L = 2.70 m) | h (CoG) | 0.55 m |
 | R (wheel) | 0.33 m | Jw (per axle) | 2.0 kg·m² |
-| footprint | 4.8 × 1.85 m | drivetrain | ⚠ RWD default; FWD/AWD as config |
+| footprint | 4.8 × 1.85 m | drivetrain | RWD (prereg V8); FWD/AWD as config, exploratory only |
 | δ max / rate | 0.55 rad / 0.7 rad/s (road wheel) | τδ | 0.08 s |
 | drive force max | ≈ 0.4·m·g at wheels | brake max | ≈ 1.0·m·g total, bias 0.65 front |
 | τT | 0.10 s | control delay d | 1 step (20 ms) |
@@ -87,7 +87,8 @@ plough), and (b) offer *structural* mismatch axes for H2.
   or on termination.
 - **Splits:** tuning split (~200 scenarios, any seed) and a frozen **test split** (≥ 1,000 per feasibility class for
   headline cells). The sampler spec + seed + SHA-256 of the generated test set are recorded in `PREREGISTRATION.md`.
-- ⚠ Calibrate the μ ranges against MCity-WSPI MARWIS statistics in P5 (literature ranges are the fallback).
+- The literature μ ranges above are frozen in the test-split spec (prereg V7). MCity-WSPI MARWIS statistics (P5) are
+  reported as an appendix realism check and never change the frozen test split.
 
 ## 4. Shared task objective (identical for MPPI cost and PPO reward)
 
@@ -95,6 +96,8 @@ Per control step: `c = w_lane·lane_violation² + w_ey·e_y² + w_v·(vx − v_r
 plus a terminal/termination penalty `C_fail` on departure or loss of control.
 - `lane_violation` = distance of the furthest footprint corner beyond the lane edge (0 inside the lane).
 - `v_ref` = entry speed. Controllers are *allowed* to slow down; the speed term is soft.
+- **Weights (prereg V1):** w_ey = 1.0 m⁻², w_lane = 100 m⁻², w_v = 2.0, w_du = 0.1 (u normalized to [-1, 1]),
+  w_prog = 0.1 m⁻¹, C_fail = 2000; per 20 ms control step.
 - Weights are fixed once, before tuning, and are **not** a tuned hyperparameter of any method. PPO-only shaping
   terms (if any) are disclosed and kept out of evaluation.
 - Episode terminations (training *and* eval): footprint departure beyond lane + 1.0 m (severe departure),

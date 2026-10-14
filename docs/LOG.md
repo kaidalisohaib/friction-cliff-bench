@@ -12,6 +12,11 @@ Format per entry: date, phase, hours, what was done, and the verdict for any run
 _(starts in P2)_
 
 ## Entries
+- **2026-10-14 (P0, prereg values approved):** Approved the remaining proposals (tuning budget, marginal and
+  recovery bands, S2 margin, H2 levels + test rule, test-split spec + seeds, RWD, M-B argmin) after a detailed
+  walkthrough. Values moved into a "Frozen values" section (V1–V8) and propagated to DESIGN, FEASIBILITY,
+  EVAL_PROTOCOL, BASELINES. Also fixed: WSPI μ calibration (P5) can no longer change the frozen test split; it is an
+  appendix check. Remaining before the tag: a final review, then `git tag prereg-v1`.
 - **2026-10-14 (P0, decisions):** Approved the objective weights (prereg P1) and chose option B for the
   delay conflict (D14: delay stays in RL DR, the MPPI bank/estimator cover the same 0–40 ms, H2 delay levels
   +{60, 100, 140} ms). Remaining prereg proposals (P2–P8) still pending approval.

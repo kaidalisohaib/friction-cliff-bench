@@ -18,7 +18,7 @@ labels scenarios by feasibility (as of 2026-10-13).
 | **undetermined** | Not certified infeasible, and no oracle succeeds. Reported separately, never merged |
 
 Within reactive-feasible, a **marginal** sub-band is defined by the reactive oracle's minimum lane clearance
-(e.g. < 0.3 m; ⚠ fix in prereg). This avoids headline results being driven by knife-edge cells.
+(< 0.30 m, best O-R seed; prereg V3). This avoids headline results being driven by knife-edge cells.
 
 "Success" (shared with `EVAL_PROTOCOL.md`): no footprint corner beyond the lane edge, no loss of control (|β| ≤ 20°),
 no spin, over the whole episode.
