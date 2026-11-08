@@ -120,3 +120,35 @@ samples, or a coarser rollout substep for the oracles (which would need its own 
 Same for the V4 note "above the simulated IMU noise floor (to confirm in P1)": the observation model does not
 exist yet, so it is built and checked in P2. P2 gets both as its first items.
 
+
+## D19: Shared prefix driver and a handover 4 s before the drop. PROPOSED 2026-11-08 (needs a prereg amendment before test labelling)
+Every scenario starts at s = 0 (sampler header), but drops lie up to ~700 m down the road (up to ~70 s at 10 m/s).
+Running oracle MPPI for the whole dry approach is the dominant cost and tells us nothing. Proposal: a fixed,
+deterministic path follower (`control/episode.py: prefix_action`, curvature feedforward + PD, curvature speed
+profile at 0.7·μ0·g with 0.4 g braking) drives every scenario on dry road until the front axle is 4 s (at the
+current speed) from the drop. That handover state is shared by every method (paired). 4 s exceeds the 3 s oracle
+horizon, so no controller could have seen the drop before handover. Side benefit: scenarios whose v0 is above the
+*dry* curve limit (e.g. 25 m/s on R50) arrive at a speed a competent driver would have; without the profile they
+crash on dry road before the ice. Episode end, success and termination rules are unchanged (DESIGN §3.2/§4).
+Cost of not doing it: the oracle labelling bill grows roughly 3–5×.
+
+## D20: The path follower W-PD counts as a witness of reactive feasibility. PROPOSED 2026-11-08
+Found in P2: the plain prefix path follower (no friction information) survives some tuning scenarios that O-R
+fails. O-R assumes the current μ persists over its horizon. On short patches that makes it over-react (hard
+braking into a slide), and on ice it over-steers past the tire peak, which spins it when grip returns. Any
+controller with at most reactive information that survives is a sound witness that the scenario is feasible
+without preview. Proposal: reactive-feasible = O-R succeeds (≥ 1 of 5 seeds) **or** W-PD succeeds. O-R stays the
+regret reference. Both label variants are computed and logged (`label`, `label_d20`). Effect on the tuning split
+at the proposed settings: 1 of 200 labels changes (preview-required → reactive-feasible). Alternative: keep A3's
+O-R-only rule and report W-PD separately.
+
+## D21: Oracle settings and compute (resolves D18 if approved). PROPOSED 2026-11-08
+See `docs/AMENDMENT_A4_DRAFT.md`, chosen on the tuning split only:
+- H = 3 s, K = 1024, σ = (0.05, 0.3), λ = 10, PD ancillary sample;
+- ρ = 0 for O-R and ρ = 0.9 for O-C;
+- O-C only where no reactive witness exists.
+
+K-check: K = 4096 changed 2 of 200 labels (one each way). Projected test-pool labelling ≈ 3 h on the shared laptop
+GPU. Also proposes the observation-noise levels (`PARAMETERS.md` §7). Becomes prereg amendment A4 once approved;
+nothing in the test pool is labelled before that.
+

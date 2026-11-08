@@ -9,11 +9,30 @@ Format per entry: date, phase, hours, what was done, and the verdict for any run
 | 2026-10-12 | P0 | ≈ 4.5 | ≈ 4.5 |
 | 2026-10-12 | P1 | ≈ 6 | ≈ 10.5 |
 | 2026-11-02 | P1/G1 | ≈ 1.5 | ≈ 12 |
+| 2026-11-02 | P2 | ≈ 6 | ≈ 18 |
 
 ## Tuning ledger (per method: trials, GPU-h, human-h)
-_(starts in P2)_
+- Oracles (not a tuned method; settings pilot on the tuning split, FEASIBILITY §3): 24 grid configs on 40 scenarios +
+  K-check (2 × 200 scenarios × 5 seeds) + 2 hard-case variant scans; ≈ 1.0 GPU-h of oracle runs (shared GPU). Logs in `runs/`.
+- Tunable methods (M-B, M-L, P-*): none yet (P3). Harness: `eval/tuning.py` (20 trials / 15 GPU-h).
 
 ## Entries
+- **2026-11-08 night (P2, GPU shared with another project's eval):**
+  - **Built and tested** (134 CPU tests + GPU slow tests):
+    - batched Warp MPPI (rollout = truth sim to 1e-5, AR(1) noise, n_iter, ESS-targeted λ, PD ancillary sample with
+      preview for O-C);
+    - O-R / O-C / M-N;
+    - episode runner with prefix handover (D19, proposed) and exact footprint metrics;
+    - labelling pipeline with A3 labels + D20 variant + S1;
+    - stats (Wilson, paired hierarchical bootstrap, TOST, Holm), observation model, Optuna harness with ledger.
+  - **Throughput:** sim 3.2e8 control steps/s; MPPI rollouts ≈ 2e8 (fixed) / 1.3e8 (field) control steps/s.
+  - **Prediction:** "MPPI oracle beats a plain PD follower" → **refuted** at first (cold start: noise around a
+    straight plan never finds the curve; too much steering noise; weight collapse). Fixed by the PD ancillary
+    sample. Some PD-only survivals remain, because O-R is certainty-equivalent (D20).
+  - **Pilot** (tuning split only): ρ = 0 best for O-R, ρ = 0.9 for O-C.
+  - **K-check:** K = 1024 vs 4096 → 2/200 labels differ (one each way).
+  - **S1:** 0 violations in every run.
+  - **Proposed:** D19, D20, D21 / A4 draft. **Test pool NOT labelled** (waits for review).
 - **2026-11-08 (G1 passed):** Approved D15 and D16. Parameters sourced with plausible ranges and confidence
   levels (`PARAMETERS.md`; e.g. normalized yaw inertia 0.93 within the published 0.85–1.05 band, CdA from the
   0.85·W·H frontal-area rule on Camry dimensions, brake share = ideal at ≈ 0.56 g). Prereg amendments A1

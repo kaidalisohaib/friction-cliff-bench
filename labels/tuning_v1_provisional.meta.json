@@ -1,0 +1,37 @@
+{
+ "git": "dd1a71aa21d25d871f0992675b5b9e355750c854",
+ "params_fingerprint": "b1e0ddceb9246f5b682c475def8a2bf9e178a4d48a0e7e91432ba89716d8cc21",
+ "O-R": {
+  "K": 1024,
+  "H": 150,
+  "sigma_steer": 0.05,
+  "sigma_long": 0.3,
+  "lam": 10.0,
+  "rho": 0.0,
+  "n_iter": 1,
+  "ess_target": 0.0,
+  "pd_sample": true,
+  "mode": 0
+ },
+ "O-C": {
+  "K": 1024,
+  "H": 150,
+  "sigma_steer": 0.05,
+  "sigma_long": 0.3,
+  "lam": 10.0,
+  "rho": 0.9,
+  "n_iter": 1,
+  "ess_target": 0.0,
+  "pd_sample": true,
+  "mode": 0
+ },
+ "n_seeds": 5,
+ "t_handover": 4.0,
+ "n_scenarios": 200,
+ "tag": "K-check K=1024",
+ "config_hash": "6df352173909",
+ "gpu_s_or": 444.28871726989746,
+ "gpu_s_oc": 94.6092312335968,
+ "s1_violations": [],
+ "wall_s": 550.1790909767151
+}

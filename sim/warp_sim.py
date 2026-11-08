@@ -385,7 +385,8 @@ def step_field_kernel(params: wp.array(dtype=Params), state: wp.array(dtype=vec1
                       track_x: wp.array2d(dtype=wp.float32), track_y: wp.array2d(dtype=wp.float32),
                       track_n: wp.array(dtype=int), ds: wp.float32, prof: wp.array(dtype=vec8),
                       base: wp.array(dtype=vec8), hints: wp.array2d(dtype=int), frenet: wp.array2d(dtype=wp.float32),
-                      axle_mu: wp.array2d(dtype=wp.float32), nsub: int, dt: wp.float32):
+                      axle_mu: wp.array2d(dtype=wp.float32), axle_sf: wp.array(dtype=vec8),
+                      axle_sr: wp.array(dtype=vec8), nsub: int, dt: wp.float32):
     i = wp.tid()
     p = params[i]
     for jj in range(_BUF - 1):
@@ -413,6 +414,8 @@ def step_field_kernel(params: wp.array(dtype=Params), state: wp.array(dtype=vec1
         hr = int(qr[2])
         sf = field_surface(qf[0], pr, base)
         sr = field_surface(qr[0], pr, base)
+        axle_sf[i] = sf  # unscaled: what a friction-informed controller is told (O-R)
+        axle_sr[i] = sr
         sf[4] = sf[4] * p.B_scale_f
         sr[4] = sr[4] * p.B_scale_r
         x = substep(x, u_s, u_l, p, sf, sr, dt)
@@ -455,6 +458,14 @@ class ScenarioSim(WarpSim):
         self.hints = wp.zeros((n, 3), dtype=int, device=device)
         self.frenet = wp.zeros((n, 2), dtype=wp.float32, device=device)
         self.axle_mu = wp.zeros((n, 2), dtype=wp.float32, device=device)
+        self.axle_sf = wp.zeros(n, dtype=vec8, device=device)
+        self.axle_sr = wp.zeros(n, dtype=vec8, device=device)
+        tt = np.zeros((len(tracks), npts), np.float32)
+        tk = np.zeros((len(tracks), npts), np.float32)
+        for k, t in enumerate(tracks):
+            tt[k, : len(t.s)], tk[k, : len(t.s)] = t.theta, t.kappa
+        self.track_theta = wp.array(tt, dtype=wp.float32, device=device)
+        self.track_kappa = wp.array(tk, dtype=wp.float32, device=device)
 
     def reset_at_start(self, p_list=None):
         """Straight-line steady state at each scenario's v0, at s = 0 on its track (heading 0)."""
@@ -475,8 +486,25 @@ class ScenarioSim(WarpSim):
         wp.launch(step_field_kernel, dim=self.n,
                   inputs=[self.params, self.state, self.buf, self.actions, self.track_id, self.track_x, self.track_y,
                           self.track_n, self.ds, self.prof, self.base, self.hints, self.frenet, self.axle_mu,
-                          N_SUBSTEPS, CONTROL_DT / N_SUBSTEPS],
+                          self.axle_sf, self.axle_sr, N_SUBSTEPS, CONTROL_DT / N_SUBSTEPS],
                   device=self.device)
+
+    def snapshot(self) -> dict:
+        """Everything that defines the simulation state of each car (for handover between controllers)."""
+        return {"state": self.state.numpy().reshape(self.n, -1).copy(), "buf": self.buf.numpy().copy(),
+                "hints": self.hints.numpy().copy(), "frenet": self.frenet.numpy().copy(),
+                "axle_sf": self.axle_sf.numpy().reshape(self.n, 8).copy(),
+                "axle_sr": self.axle_sr.numpy().reshape(self.n, 8).copy()}
+
+    def load(self, snap: dict) -> None:
+        """Restore a snapshot (rows must match this sim's scenarios)."""
+        d = self.device
+        self.state.assign(wp.array(np.ascontiguousarray(snap["state"], np.float32), dtype=vec13, device=d))
+        self.buf.assign(wp.array(np.ascontiguousarray(snap["buf"], np.float32), dtype=wp.float32, device=d))
+        self.hints.assign(wp.array(np.ascontiguousarray(snap["hints"], np.int32), dtype=int, device=d))
+        self.frenet.assign(wp.array(np.ascontiguousarray(snap["frenet"], np.float32), dtype=wp.float32, device=d))
+        self.axle_sf.assign(wp.array(np.ascontiguousarray(snap["axle_sf"], np.float32), dtype=vec8, device=d))
+        self.axle_sr.assign(wp.array(np.ascontiguousarray(snap["axle_sr"], np.float32), dtype=vec8, device=d))
 
     def get_frenet(self) -> np.ndarray:
         return self.frenet.numpy().astype(np.float64)

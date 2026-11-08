@@ -133,3 +133,11 @@ def to_jsonl(scenarios: list[Scenario]) -> str:
 
 def sha256(text: str) -> str:
     return hashlib.sha256(text.encode()).hexdigest()
+
+
+def load_jsonl(path) -> tuple[dict, list[Scenario]]:
+    """Read a committed split file (the authority, prereg A2): (header, scenarios)."""
+    with open(path) as f:
+        lines = f.read().splitlines()
+    head = json.loads(lines[0])["header"]
+    return head, [Scenario(**json.loads(line)) for line in lines[1:]]

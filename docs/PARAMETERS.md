@@ -55,6 +55,18 @@ G = 9.81, ρ_air = 1.225, control dt 20 ms with 20 substeps of 1 ms, max delay 8
 v_lo = 0.5 / v_hi = 2.0 m/s on |v|, τ_kin = 0.05 s, ε_v = 0.1 m/s; switches σ_relax = 0 and α = 0 (the nominal
 model; H2 changes them).
 
+## 7. Observation noise (P2, `sim/observe.py`; not part of the A1 freeze, which covers the truth vehicle)
+| Channel | White-noise std | Per-episode bias std | Why |
+|---|---|---|---|
+| ax, ay | 0.05 m/s² | 0.05 m/s² | Consumer-grade automotive MEMS accelerometer at 50 Hz after the usual filtering | E |
+| r (yaw rate) | 0.005 rad/s | 0.002 rad/s | MEMS gyro (≈ 0.3°/s noise, ≈ 0.1°/s residual bias) | E |
+| wheel speeds | 0.1 rad/s | — | Production wheel-speed sensor quantization at 50 Hz | E |
+| steering angle | 0.001 rad | — | Steering-angle sensor resolution ≈ 0.1° at the hand wheel / ratio | E |
+| e_y, e_ψ, speed | 0.05 m, 0.005 rad, 0.05 m/s | — | Lane-level localization (camera + map) | E |
+Check (prereg V4 note): the recovery band |Δr| ≤ 0.05 rad/s is 10× the gyro noise and |Δe_y| ≤ 0.15 m is 3× the
+localization noise; the band is evaluated on the true state anyway, so noise cannot move it. These levels go
+into a dated amendment together with the oracle settings before any test-split use.
+
 ## 6. What is weak, honestly
 - Jw, τδ, τT and the delay are engineering choices. They are reasonable, and the delay is covered by DR and H2,
   but no source pins them.
