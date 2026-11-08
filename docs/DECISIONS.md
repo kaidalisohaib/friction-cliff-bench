@@ -77,7 +77,7 @@ equally. Chosen: **B**. RL DR uses extra actuator delay 0–40 ms on both channe
 what either side has seen. Why: keeps the realistic robustness of DR without rigging H2 in RL's
 favour. Cost: M-B bank is ~3× larger. Supersedes the "remove delay from DR" proposal.
 
-## D15: Tire surfaces re-sourced; separate longitudinal and lateral curves; understeer via axle stiffness. DECIDED 2026-10-14 (proposed values; frozen at G1 with D13)
+## D15: Tire surfaces re-sourced; separate longitudinal and lateral curves; understeer via axle stiffness. DECIDED 2026-10-14 (proposed values; frozen at G1 with D13) → approved and frozen 2026-11-08 (prereg A1)
 Found in P1: the DESIGN "typical MF coefficients" (MathWorks Simscape table) describe *longitudinal* force only.
 Applied to lateral slip they put the ice lateral peak at ~21 deg (measured: 2-4 deg, CRREL). And with equal tire
 coefficients on both axles a bicycle model is exactly neutral-steer. Changes:
@@ -93,7 +93,30 @@ coefficients on both axles a bicycle model is exactly neutral-steer. Changes:
 Consequences: dry/wet steady cornering limit within 3% of sqrt(mu g R) (V2b); ice now ~0.96, snow ~0.92 (by
 design: snow lateral force approaches its peak only at large angles). Sources still to strengthen: primary CRREL report text, a published lateral MF parameter set for a passenger tire.
 
-## D16: Certificate labels use the arrival state; S1 checked per run at the actual arrival state. OPEN (proposed 2026-10-14)
+## D16: Certificate labels use the arrival state; S1 checked per run at the actual arrival state. OPEN (proposed 2026-10-14) → DECIDED 2026-11-08 (prereg A3)
 See `FEASIBILITY.md` §2.2. Needed because a clairvoyant oracle can pre-brake and arrive slower than the reference
 speed, so "no oracle succeeds in a certified-infeasible scenario" is not the right test for an arrival-state
 certificate. Requires a dated prereg amendment (S1 wording) before any test-split labelling.
+**Update 2026-11-08:** approved. Adopted as prereg amendment A3, which adds a label precedence rule
+(reactive-feasible > preview-required > certified-infeasible > undetermined) and the *certified-reactive-infeasible*
+flag, so a scenario certified at the nominal arrival state but survived by a pre-braking O-C has exactly one label.
+
+## D17: G1 freezes are enforced by hashes in CI. DECIDED 2026-11-08
+Prereg A1/A2 record SHA-256 hashes of the frozen parameters (`sim.params.fingerprint()`) and of the committed
+scenario files (`splits/`). `tests/test_frozen.py` checks them on every CI run, so a frozen value cannot change
+without a failing test and a new dated amendment. The committed split files are the authority (not regeneration),
+because a future numpy could change the random stream. `.gitattributes` marks them `-text` so line endings never
+change their bytes.
+
+## D18: GPU throughput measurement and the oracle compute budget move to the start of P2. DECIDED 2026-11-08
+Prereg V2/V7 ask for P1 throughput measurements (PPO run length; oracle labelling cost). The GPU was busy with an
+another project eval run during the G1 session (project rule 1), and the oracle cost depends on the MPPI kernel that
+P2 builds. Both measurements are made at the start of P2, and any K/horizon (V7) or G (V2) amendment is dated
+before any labelling or tuning starts. Planning projection (not a result): oracle labelling as specified
+(2 oracles × 5 seeds × 16k samples × 3 s horizon on 4,000 scenarios, 1 ms substeps in every rollout) is on the
+order of 10^15 substeps, which is very likely too large for one laptop GPU. Options to weigh then: start MPPI only
+shortly before the drop (steady tracking before it is not informative), shorter episodes after the patch, fewer
+samples, or a coarser rollout substep for the oracles (which would need its own validation).
+Same for the V4 note "above the simulated IMU noise floor (to confirm in P1)": the observation model does not
+exist yet, so it is built and checked in P2. P2 gets both as its first items.
+

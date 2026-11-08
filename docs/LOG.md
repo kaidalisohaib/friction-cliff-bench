@@ -7,11 +7,21 @@ Format per entry: date, phase, hours, what was done, and the verdict for any run
 |---|---|---|---|
 | 2026-10-12 | planning | — | — |
 | 2026-10-12 | P0 | ≈ 4.5 | ≈ 4.5 |
+| 2026-10-12 | P1 | ≈ 6 | ≈ 10.5 |
+| 2026-11-02 | P1/G1 | ≈ 1.5 | ≈ 12 |
 
 ## Tuning ledger (per method: trials, GPU-h, human-h)
 _(starts in P2)_
 
 ## Entries
+- **2026-11-08 (G1 passed):** Approved D15 and D16. Parameters sourced with plausible ranges and confidence
+  levels (`PARAMETERS.md`; e.g. normalized yaw inertia 0.93 within the published 0.85–1.05 band, CdA from the
+  0.85·W·H frontal-area rule on Camry dimensions, brake share = ideal at ≈ 0.56 g). Prereg amendments A1
+  (parameter fingerprint), A2 (SHA-256 of the test pool, the three top-up blocks and the tuning split, committed
+  under `splits/`), A3 (arrival-state S1, label precedence). `tests/test_frozen.py` enforces both freezes in CI (D17).
+  Prediction: regenerating the sets from the frozen seeds reproduces the files, and tuning/test share no instance
+  → **confirmed** (114 tests pass). Not done: GPU throughput (another project's eval was running, so no GPU job was
+  started) → moved to P2 start with the oracle compute budget (D18).
 - **2026-10-14 (P1, scenarios + certificate):** Tracks (5 shared, clothoid–arc–clothoid 90° curves), Frenet
   projection, per-axle per-substep friction field, prereg V7 sampler (deterministic, canonical JSONL; SHA not yet
   recorded). Analytic certificate v1 (arc drops, arrival-state based) with the soundness argument written in

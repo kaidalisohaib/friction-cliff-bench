@@ -101,7 +101,7 @@ monotone in speed; Monte Carlo random point-mass trajectories never beat ρ_lb; 
 survives a certified case; the full simulator with strong heuristic controllers leaves the lane in certified
 cases while being in lane at arrival (S1 preview).
 
-### 2.2 What "arrival state" means for labels and S1 (OPEN, D16; needs a prereg amendment)
+### 2.2 What "arrival state" means for labels and S1 (DECIDED 2026-11-08, D16; prereg amendment A3)
 The certificate is a function of the arrival state. A clairvoyant controller may brake *before* the patch and
 arrive slower, so a scenario certified at the nominal arrival state (v0, on the centreline) can still be
 survived by O-C. Proposed: (a) label *certified-infeasible* = the certificate holds at the nominal arrival state
@@ -110,6 +110,9 @@ form of reactive infeasibility); (b) check S1 per oracle run at that run's *actu
 (speed, |e|, |ė|), which is sharp and sound for both oracles; (c) O-C successes in certified scenarios are
 expected (pre-braking) and are reported, not treated as bugs. The prereg's S1 wording ("no oracle succeeds in a
 certified-infeasible scenario") would be refined by a dated amendment before any test-split labelling.
+**Update 2026-11-08:** approved; adopted as prereg amendment A3, which also fixes the label
+precedence (reactive-feasible > preview-required > certified-infeasible > undetermined) and the
+*certified-reactive-infeasible* flag.
 
 ## 3. Layer 2: constructive oracles (feasibility witnesses)
 - **Reactive oracle:** MPPI with the *exact* truth simulator as its rollout model and the true *current* per-axle
@@ -120,6 +123,7 @@ certified-infeasible scenario") would be refined by a dated amendment before any
 - A success by either oracle is a **witness** that the scenario is feasible at that information level.
 
 ## 4. Sanity gate S1
+(Refined by prereg amendment A3, 2026-11-08: checked per run at the actual arrival state; see §2.2.)
 No oracle may succeed in a certified-infeasible scenario. If one does, it is a bug (simulator, certificate, or
 metric) and must be fixed before any results are reported.
 

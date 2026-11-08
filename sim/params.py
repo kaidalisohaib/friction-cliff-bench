@@ -1,13 +1,15 @@
 """Vehicle and surface parameters (DESIGN.md §2.3).
 
 Single source of truth: the NumPy reference and the Warp simulator both read these dataclasses.
-Values are the *initial* generic mid-size sedan from DESIGN.md; they get sources and are frozen by a
-dated prereg amendment at G1 (D13).
+Values are a generic mid-size sedan; sources and plausible ranges are in docs/PARAMETERS.md. They are frozen by
+prereg amendment A1 (G1, D13): fingerprint() must equal the recorded hash (tests/test_frozen.py).
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, fields, replace
+import hashlib
+import json
+from dataclasses import asdict, dataclass, fields, replace
 
 G = 9.81  # gravity [m/s^2]
 RHO_AIR = 1.225  # air density [kg/m^3]
@@ -117,3 +119,21 @@ MU_RANGES = {"dry": (0.85, 1.0), "wet": (0.5, 0.8), "snow": (0.20, 0.35), "ice":
 
 def param_names() -> list[str]:
     return [f.name for f in fields(VehicleParams)]
+
+
+def frozen_payload() -> dict:
+    """Everything the G1 parameter freeze covers (prereg amendment A1): vehicle defaults, surface tables, mu
+    ranges, and the fixed numerical constants. Canonical form for fingerprint()."""
+    return {
+        "constants": {"G": G, "RHO_AIR": RHO_AIR, "CONTROL_DT": CONTROL_DT, "N_SUBSTEPS": N_SUBSTEPS,
+                      "MAX_DELAY_STEPS": MAX_DELAY_STEPS},
+        "vehicle": asdict(VehicleParams()),
+        "surfaces": {k: asdict(s) for k, s in SURFACES.items()},
+        "mu_ranges": {k: list(v) for k, v in MU_RANGES.items()},
+    }
+
+
+def fingerprint() -> str:
+    """SHA-256 of the canonical JSON of frozen_payload() (sorted keys; floats via repr, so exact)."""
+    text = json.dumps(frozen_payload(), sort_keys=True)
+    return hashlib.sha256(text.encode()).hexdigest()

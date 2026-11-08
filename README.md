@@ -24,10 +24,11 @@ family. A feasibility-audited benchmark can map those regimes on one laptop GPU.
 |---|---|
 | [the project rules](the project rules) | Orientation + working rules for agents (and humans) |
 | [`docs/DESIGN.md`](docs/DESIGN.md) | Vehicle model, parameters, tracks, scenario space, shared objective, simulator validation suite |
+| [`docs/PARAMETERS.md`](docs/PARAMETERS.md) | Where every vehicle/tire value comes from, plausible ranges, confidence (frozen at G1) |
 | [`docs/FEASIBILITY.md`](docs/FEASIBILITY.md) | Labels, analytic certificate (soundness), oracles, sanity gate S1 |
 | [`docs/BASELINES.md`](docs/BASELINES.md) | Controller set, fairness checklist, MPPI/RL/C++ implementation specs |
 | [`docs/EVAL_PROTOCOL.md`](docs/EVAL_PROTOCOL.md) | Metrics, splits, seeds, statistics, reporting rules |
-| [`docs/PREREGISTRATION.md`](docs/PREREGISTRATION.md) | RQs, H1–H3 + falsifiers, E1–E5, sanity gates (**draft until tag `prereg-v1`**) |
+| [`docs/PREREGISTRATION.md`](docs/PREREGISTRATION.md) | RQs, H1–H3 + falsifiers, E1–E5, sanity gates (tagged `prereg-v1`; dated amendments A1–A3 at the bottom) |
 | [`docs/RELATED_WORK.md`](docs/RELATED_WORK.md) | Closest work, "how we differ", scoop-watch log |
 | [`docs/DATA_AND_LICENSES.md`](docs/DATA_AND_LICENSES.md) | Tools/datasets and what may be published |
 | [`docs/DECISIONS.md`](docs/DECISIONS.md) | Dated design decisions and why |
