@@ -37,6 +37,7 @@ def test_noise_free_observation_matches_truth():
     assert np.isclose(get["e_y"], fr[1], atol=1e-6)
     assert np.isclose(get["u_s_prev"], 0.1) and np.isclose(get["u_l_prev"], 0.2)
     assert np.isclose(get["speed"], np.hypot(x[3], x[4]), atol=1e-5)
+    assert np.isclose(get["vy"], x[4], atol=1e-6)
     i = min(int(fr[0] / T.DS), len(tr.s) - 1)
     assert np.isclose(get["k0"], tr.kappa[i], atol=2e-4)  # projection hint vs floor(s/DS): same table cell
 

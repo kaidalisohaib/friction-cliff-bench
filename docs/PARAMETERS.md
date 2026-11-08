@@ -63,6 +63,7 @@ model; H2 changes them).
 | wheel speeds | 0.1 rad/s | — | Production wheel-speed sensor quantization at 50 Hz | E |
 | steering angle | 0.001 rad | — | Steering-angle sensor resolution ≈ 0.1° at the hand wheel / ratio | E |
 | e_y, e_ψ, speed | 0.05 m, 0.005 rad, 0.05 m/s | — | Lane-level localization (camera + map) | E |
+| vy (lateral velocity) | 0.1 m/s | — | Sideslip estimate (GNSS/INS fusion class); added by D24 so the policies see what the MPPI rollouts start from | E |
 Check (prereg V4 note): the recovery band |Δr| ≤ 0.05 rad/s is 10× the gyro noise and |Δe_y| ≤ 0.15 m is 3× the
 localization noise; the band is evaluated on the true state anyway, so noise cannot move it. These levels go
 into a dated amendment together with the oracle settings before any test-split use.

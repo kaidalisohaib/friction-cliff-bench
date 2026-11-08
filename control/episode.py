@@ -1,6 +1,6 @@
 """Episodes: prefix driving, controller handover, exact metrics, per-run records (EVAL_PROTOCOL.md §1).
 
-Episode protocol (DESIGN.md §3.2; the handover point is proposed in D19, not yet a prereg amendment):
+Episode protocol (DESIGN.md §3.2; handover per D19 / prereg A4.1):
   1. Prefix. Every scenario starts at s = 0 in straight-line steady state at v0 (sampler header). A fixed,
      deterministic path follower (`prefix_action`) drives it on dry road until the front axle is T_HANDOVER
      seconds (at the current speed) before the friction drop, or immediately if that point is already passed at
@@ -23,6 +23,7 @@ import numpy as np
 import warp as wp
 
 from scenarios import track as T
+from scenarios.sampler import A_LAT_FRAC
 from sim.params import CONTROL_DT, G, VehicleParams
 from sim.warp_sim import Params, ScenarioSim, make_params, project_local, vec13
 
@@ -79,7 +80,7 @@ def metrics_kernel(params: wp.array(dtype=Params), state: wp.array(dtype=vec13),
     out[i, 6] = speed
 
 
-def speed_profile(track: T.Track, v0: float, mu0: float, a_lat_frac=0.7, a_brake=0.4 * G) -> np.ndarray:
+def speed_profile(track: T.Track, v0: float, mu0: float, a_lat_frac=A_LAT_FRAC, a_brake=0.4 * G) -> np.ndarray:
     """Max speed along the track: v <= sqrt(a_lat / |kappa|) with a_lat = 0.7 mu0 g, braking at <= a_brake
     (backward pass), capped at v0."""
     k = np.abs(track.kappa)
@@ -89,8 +90,46 @@ def speed_profile(track: T.Track, v0: float, mu0: float, a_lat_frac=0.7, a_brake
     return v
 
 
+_PREFIX_CACHE: dict = {}
+
+
+def _prefix_tables(scs, tracks, profiles):
+    key = (id(profiles), len(profiles), id(scs))
+    if key not in _PREFIX_CACHE:
+        if len(_PREFIX_CACHE) > 64:
+            _PREFIX_CACHE.clear()
+        npt = np.array([len(t.s) for t in tracks])
+        th = np.zeros((len(tracks), npt.max()))
+        ka = np.zeros((len(tracks), npt.max()))
+        for k, t in enumerate(tracks):
+            th[k, : npt[k]], ka[k, : npt[k]] = t.theta, t.kappa
+        tid = np.array([sc.track_id for sc in scs])
+        lp = np.array([len(pr) for pr in profiles])
+        pr = np.zeros((len(profiles), lp.max()))
+        for j, v in enumerate(profiles):
+            pr[j, : len(v)] = v
+        _PREFIX_CACHE[key] = (tid, npt[tid], th, ka, pr, lp, profiles, scs)
+    return _PREFIX_CACHE[key][:6]
+
+
 def prefix_action(fr, X, scs, tracks, profiles, p: VehicleParams):
-    """Deterministic path follower (curvature feedforward + PD on e, e_psi, yaw-rate damping; P on speed)."""
+    """Deterministic path follower (curvature feedforward + PD on e, e_psi, yaw-rate damping; P on speed).
+    Vectorized over cars; identical to `prefix_action_loop` (tested)."""
+    tid, n_tr, th, ka, pr, lp = _prefix_tables(scs, tracks, profiles)
+    s_, e = fr[:, 0], fr[:, 1]
+    i = np.minimum(np.trunc(s_ / T.DS).astype(np.int64), n_tr - 1)
+    i_w = np.where(i < 0, i + n_tr, i)  # python negative indexing, as in the loop version
+    thi, kai = th[tid, i_w], ka[tid, i_w]
+    e_psi = np.angle(np.exp(1j * (X[:, 2] - thi)))
+    delta = p.L * kai - 0.15 * e - 0.8 * e_psi - 0.1 * (X[:, 5] - X[:, 3] * kai)
+    i_ahead = np.minimum(i + np.trunc(np.maximum(X[:, 3], 1.0) * 0.5 / T.DS).astype(np.int64), n_tr - 1)
+    i_ahead = np.where(i_ahead < 0, i_ahead + lp, i_ahead)
+    v_t = pr[np.arange(len(tid)), i_ahead]
+    return np.stack([np.clip(delta / p.delta_max, -1, 1), np.clip(0.3 * (v_t - X[:, 3]), -1, 1)], 1)
+
+
+def prefix_action_loop(fr, X, scs, tracks, profiles, p: VehicleParams):
+    """Reference (scalar) implementation of `prefix_action`."""
     acts = np.zeros((len(scs), 2))
     for j, sc in enumerate(scs):
         tr = tracks[sc.track_id]
@@ -104,11 +143,11 @@ def prefix_action(fr, X, scs, tracks, profiles, p: VehicleParams):
     return acts
 
 
-def run_prefix(scs, tracks, p: VehicleParams = VehicleParams(), device="cpu"):
+def run_prefix(scs, tracks, p: VehicleParams = VehicleParams(), device="cpu", a_lat_frac: float = A_LAT_FRAC):
     """Drive every scenario to its handover state. Returns (snapshot dict with one row per scenario, info)."""
     sim = ScenarioSim(scs, p, tracks, device)
     sim.reset_at_start()
-    profiles = [speed_profile(tracks[sc.track_id], sc.v0, sc.mu0) for sc in scs]
+    profiles = [speed_profile(tracks[sc.track_id], sc.v0, sc.mu0, a_lat_frac) for sc in scs]
     n = len(scs)
     done = np.zeros(n, bool)
     snap = None

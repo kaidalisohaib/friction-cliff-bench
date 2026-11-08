@@ -46,7 +46,8 @@ def test_d20_label_counts_the_pd_witness():
     from sim.params import VehicleParams
     p = VehicleParams()
     lab = assign_label(EASY, [rec("O-R", False)], [rec("O-C", True)], TRACKS, p, pd_rec=rec("W-PD", True))
-    assert lab["label"] == "preview-required" and lab["label_d20"] == "reactive-feasible"
+    assert lab["label_or_only"] == "preview-required" and lab["label"] == "reactive-feasible"
+    assert not lab["adaptation_required"]
 
 
 def test_s1_flags_a_survivor_whose_arrival_state_is_certified():

@@ -32,6 +32,7 @@ from dataclasses import dataclass
 import numpy as np
 import warp as wp
 
+from scenarios.sampler import v_eff
 from sim.params import CONTROL_DT, N_SUBSTEPS, VehicleParams
 from sim.warp_sim import Params, ScenarioSim, field_surface, make_params, project_local, substep, vec8, vec13
 
@@ -350,7 +351,7 @@ class MPPI:
         plist = mp if isinstance(mp, list) else [mp] * n
         self.mparams = wp.array([make_params(p) for p in plist], dtype=Params, device=d)
         self.cw = make_cost(cost)
-        vr = np.array([sc.v0 for sc in sim.scenarios], np.float32) if v_ref is None else np.asarray(v_ref, np.float32)
+        vr = np.array([v_eff(sc) for sc in sim.scenarios], np.float32) if v_ref is None else np.asarray(v_ref, np.float32)
         self.v_ref = wp.array(vr, dtype=wp.float32, device=d)
         self.U = wp.zeros((n, cfg.H, 2), dtype=wp.float32, device=d)
         self.V = wp.zeros((n, cfg.K, cfg.H, 2), dtype=wp.float32, device=d)

@@ -1,16 +1,19 @@
 """Run the oracles on a split file and write records, labels and S1 results (labelling/label.py).
 
-The test pool is only labelled with oracle settings frozen by a dated prereg amendment (V7 compute note, D18);
-this script refuses `test_*` files unless --allow-test is given.
+Default: the frozen oracle settings of prereg A4 (`control/controllers.py: ORACLE_OR, ORACLE_OC`, 5 seeds).
+`--explore` unlocks the settings flags for pilots on the tuning split; it is refused for `test_*` files, so the
+test pool can only ever be labelled with the frozen settings.
 
-Run:  PYTHONPATH=. uv run python scripts/label_split.py splits/tuning_v1.jsonl --out runs/label_tuning [--K 4096 --H 150]
+Run:  PYTHONPATH=. uv run python scripts/label_split.py splits/test_v1_T0.jsonl --out runs/label_test_T0
+      PYTHONPATH=. uv run python scripts/label_split.py splits/tuning_v1.jsonl --out runs/x --explore --K 4096
 """
 
 import argparse
 from collections import Counter
+from dataclasses import replace
 from pathlib import Path
 
-from control.mppi import MPPIConfig
+from control.controllers import ORACLE_OC, ORACLE_OR
 from labelling.label import label_split
 from scenarios import sampler as S
 from scenarios import track as T
@@ -20,34 +23,42 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("split")
     ap.add_argument("--out", required=True)
-    ap.add_argument("--K", type=int, default=4096)
-    ap.add_argument("--H", type=int, default=150)
-    ap.add_argument("--lam", type=float, default=10.0)
-    ap.add_argument("--sig-steer", type=float, default=0.3)
-    ap.add_argument("--sig-long", type=float, default=0.4)
-    ap.add_argument("--rho", type=float, default=0.0)
-    ap.add_argument("--ess", type=float, default=0.0)
-    ap.add_argument("--n-iter", type=int, default=1)
-    ap.add_argument("--pd-sample", action="store_true")
-    ap.add_argument("--oc-rho", type=float, default=None, help="O-C AR(1) rho (default: same as --rho)")
+    ap.add_argument("--explore", action="store_true", help="allow the settings flags below (never on test files)")
+    ap.add_argument("--K", type=int)
+    ap.add_argument("--H", type=int)
+    ap.add_argument("--lam", type=float)
+    ap.add_argument("--sig-steer", type=float)
+    ap.add_argument("--sig-long", type=float)
+    ap.add_argument("--rho", type=float)
+    ap.add_argument("--oc-rho", type=float)
+    ap.add_argument("--n-iter", type=int)
     ap.add_argument("--seeds", type=int, default=5)
     ap.add_argument("--batch", type=int, default=32)
     ap.add_argument("--limit", type=int, default=0)
+    ap.add_argument("--only", default="", help="comma-separated scenario ids (explore only)")
     ap.add_argument("--device", default="cuda:0")
-    ap.add_argument("--allow-test", action="store_true")
     ap.add_argument("--tag", default="")
     a = ap.parse_args()
-    if Path(a.split).name.startswith("test") and not a.allow_test:
-        raise SystemExit("refusing to label a test file without frozen oracle settings (--allow-test)")
+    over = {k: getattr(a, k2) for k, k2 in [("K", "K"), ("H", "H"), ("lam", "lam"), ("sigma_steer", "sig_steer"),
+                                            ("sigma_long", "sig_long"), ("n_iter", "n_iter")] if getattr(a, k2) is not None}
+    changed = bool(over) or a.rho is not None or a.oc_rho is not None or a.seeds != 5 or a.limit or a.only
+    if Path(a.split).name.startswith("test") and (a.explore or changed):
+        raise SystemExit("test files are labelled only with the frozen prereg-A4 settings (no flags)")
+    if changed and not a.explore:
+        raise SystemExit("settings flags need --explore")
+    cfg = replace(ORACLE_OR, **over, **({"rho": a.rho} if a.rho is not None else {}))
+    cfg_oc = replace(ORACLE_OC, **over, **({"rho": a.oc_rho} if a.oc_rho is not None else {}))
     _, scs = S.load_jsonl(a.split)
+    if a.only:
+        keep = set(a.only.split(","))
+        scs = [s for s in scs if s.sid in keep]
     if a.limit:
         scs = scs[: a.limit]
-    cfg = MPPIConfig(K=a.K, H=a.H, sigma_steer=a.sig_steer, sigma_long=a.sig_long, lam=a.lam, rho=a.rho, ess_target=a.ess, n_iter=a.n_iter, pd_sample=a.pd_sample)
-    cfg_oc = cfg if a.oc_rho is None else MPPIConfig(**{**cfg.__dict__, "rho": a.oc_rho})
     labels, s1, meta = label_split(scs, T.all_tracks(), Path(a.out), cfg, cfg_oc, a.seeds, device=a.device,
-                                   batch=a.batch, tag=a.tag)
-    print("A3 labels:", Counter(lab["label"] for lab in labels))
-    print("D20 labels:", Counter(lab["label_d20"] for lab in labels))
+                                   batch=a.batch, tag=a.tag or ("frozen-A4" if not changed else "explore"))
+    print("labels:", Counter(lab["label"] for lab in labels))
+    print("O-R-only labels:", Counter(lab["label_or_only"] for lab in labels))
+    print("adaptation-required:", sum(lab["adaptation_required"] for lab in labels))
     print("S1 violations:", len(s1), "| O-R GPU s:", round(meta["gpu_s_or"]), "| O-C GPU s:", round(meta["gpu_s_oc"]))
 
 

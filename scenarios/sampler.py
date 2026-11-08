@@ -24,7 +24,9 @@ import numpy as np
 
 from scenarios import track as T
 from scenarios.friction import INF_PATCH
-from sim.params import MU_RANGES
+from sim.params import G, MU_RANGES
+
+A_LAT_FRAC = 0.7  # lateral-acceleration fraction of mu0*g the shared dry driver uses in curves (D19, prereg A4)
 
 SPEC_VERSION = "v1"
 V_STRATA = (10.0, 15.0, 20.0, 25.0)
@@ -72,6 +74,16 @@ class Scenario:
     s_drop: float
 
 
+def v_eff(sc: "Scenario") -> float:
+    """Effective reference speed (prereg A4.2): v0, capped at what the shared dry driver carries through the
+    curve, sqrt(A_LAT_FRAC * mu0 * g * R). For about 10% of cells v0 itself exceeds what dry road allows in that
+    curve, so v0 is unreachable. v_eff is the target speed in the objective, the nominal arrival speed of the
+    certificate, and the speed axis of the figures. v0 stays the sampled cell value."""
+    if sc.R <= 0.0:
+        return float(sc.v0)
+    return float(min(sc.v0, np.sqrt(A_LAT_FRAC * sc.mu0 * G * sc.R)))
+
+
 def decode_cell(c: int):
     c, it = divmod(c, len(TRANSITIONS))
     c, ip = divmod(c, len(PATCH_LENGTHS))
@@ -115,6 +127,14 @@ def test_pool(block: int = 0) -> list[Scenario]:
 
 def tuning_split() -> list[Scenario]:
     return sample(200, TUNING_SEED, "U-")
+
+
+TUNING_B2_SEED = _seed("friction-cliff-bench tuning split v1 block 2")
+
+
+def tuning_block2() -> list[Scenario]:
+    """Second 200-scenario tuning block (prereg A4.7): S2 needs >= 200 reactive-feasible tuning scenarios (V5)."""
+    return sample(200, TUNING_B2_SEED, "U2-")
 
 
 def header() -> dict:

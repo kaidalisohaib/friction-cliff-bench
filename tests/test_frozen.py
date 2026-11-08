@@ -20,10 +20,12 @@ FROZEN_SPLITS = {
     "test_v1_T2.jsonl": "9deb033a547ae50c824a1d340046e988056b80c356cbcb361d26f75c39879cb6",
     "test_v1_T3.jsonl": "2f1c4f4693216af3f2aa37a58b660c164b08757104a554c5c6acfaf351ba612e",
     "tuning_v1.jsonl": "5dd1e7e7d8038c1ceb2aa53423f8e1f70946d72b21df293f505afa5cd0b14a63",
+    # prereg amendment A4.7 (2026-11-08): second tuning block
+    "tuning_v1_b2.jsonl": "42fac623f33c41b2b4caa26746951a6deec18e84f5a034ec6abd77b3b28f1862",
 }
 MAKERS = {"test_v1_T0.jsonl": lambda: S.test_pool(0), "test_v1_T1.jsonl": lambda: S.test_pool(1),
           "test_v1_T2.jsonl": lambda: S.test_pool(2), "test_v1_T3.jsonl": lambda: S.test_pool(3),
-          "tuning_v1.jsonl": S.tuning_split}
+          "tuning_v1.jsonl": S.tuning_split, "tuning_v1_b2.jsonl": S.tuning_block2}
 SPLITS = Path(__file__).resolve().parents[1] / "splits"
 
 
@@ -49,7 +51,7 @@ def test_tuning_and_test_sets_share_no_instance():
     def keys(name):
         rows = [json.loads(line) for line in (SPLITS / name).read_text().splitlines()[1:]]
         return {(r["cell"], r["v0"], r["mu0"], r["mu1"]) for r in rows}
-    tune = keys("tuning_v1.jsonl")
+    tune = keys("tuning_v1.jsonl") | keys("tuning_v1_b2.jsonl")
     for name in FROZEN_SPLITS:
         if name.startswith("test"):
             assert not (tune & keys(name)), name

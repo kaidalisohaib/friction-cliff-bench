@@ -39,7 +39,7 @@ def main():
         labels, s1, meta = label_split(scs, tracks, Path(a.out) / tag, cfg, cfg, a.seeds, tag=tag, log=lambda m: None)
         c = Counter(lab["label"] for lab in labels)
         clear = [lab["or_best_clearance"] for lab in labels if lab["label"] == "reactive-feasible"]
-        c20 = Counter(lab["label_d20"] for lab in labels)
+        c20 = Counter(lab["label_or_only"] for lab in labels)
         row = {"tag": tag, **c, "d20": dict(c20), "s1": len(s1), "median_clear_rf": float(np.median(clear)) if clear else None,
                "gpu_s": round(meta["gpu_s_or"] + meta["gpu_s_oc"])}
         rows.append(row)

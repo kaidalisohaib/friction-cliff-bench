@@ -126,3 +126,19 @@ def test_frenet_tracks_the_car_on_a_curve():
             max_e = max(max_e, abs(e))
     s_end = sim.get_frenet()[0, 0]
     assert s_end == pytest.approx(400.0, rel=0.03) and max_e < 0.3
+
+
+def test_v_eff_caps_unreachable_speeds_and_matches_driver_profile():
+    """prereg A4.2: v_eff = min(v0, sqrt(0.7 mu0 g R)); equals the shared driver's speed on the arc."""
+    from control.episode import speed_profile
+    tracks = T.all_tracks()
+    for sc in S.tuning_split()[:60]:
+        ve = S.v_eff(sc)
+        assert ve <= sc.v0 + 1e-12
+        if sc.R == 0.0:
+            assert ve == sc.v0
+        else:
+            prof = speed_profile(tracks[sc.track_id], sc.v0, sc.mu0)
+            assert abs(prof.min() - ve) < 1e-6
+    sc = S.Scenario("x", 0, 25, "R50-apex", 50.0, "apex", "ice", 1e9, 0.0, 25.0, 0.925, 0.1, 1, 0.0)
+    assert abs(S.v_eff(sc) - np.sqrt(0.7 * 0.925 * 9.81 * 50.0)) < 1e-9

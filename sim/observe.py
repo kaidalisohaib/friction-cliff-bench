@@ -7,6 +7,8 @@ Per car and control step, a float32 vector (layout OBS_NAMES):
   last commanded action (u_s, u_l) exact (the controller knows what it sent)
   path-relative e_y [m], e_psi [rad], speed [m/s] (localization), white noise
   geometry preview: centreline curvature at s + {0, 10, 20, 30, 40} m (map knowledge, no friction)
+  lateral velocity vy [m/s]        white noise 0.1 m/s (a sideslip estimate, as from GNSS/INS fusion; D24:
+                                   MPPI methods start rollouts from the true state, so the policies get vy too)
 Friction never appears. ay is the body-frame lateral acceleration over the last control step,
 (vy - vy_prev)/dt + r vx; ax is the simulator's inertial longitudinal acceleration.
 
@@ -24,12 +26,13 @@ from sim.params import CONTROL_DT
 from sim.warp_sim import ScenarioSim, vec13
 
 OBS_NAMES = ["ax", "ay", "r", "wf", "wr", "delta", "u_s_prev", "u_l_prev", "e_y", "e_psi", "speed",
-             "k0", "k10", "k20", "k30", "k40"]
+             "k0", "k10", "k20", "k30", "k40", "vy"]
 N_OBS = len(OBS_NAMES)
 PREVIEW = (0.0, 10.0, 20.0, 30.0, 40.0)
 # (white-noise std, bias std) per noisy channel
 NOISE = {"ax": (0.05, 0.05), "ay": (0.05, 0.05), "r": (0.005, 0.002), "wf": (0.1, 0.0), "wr": (0.1, 0.0),
-         "delta": (0.001, 0.0), "e_y": (0.05, 0.0), "e_psi": (0.005, 0.0), "speed": (0.05, 0.0)}
+         "delta": (0.001, 0.0), "e_y": (0.05, 0.0), "e_psi": (0.005, 0.0), "speed": (0.05, 0.0),
+         "vy": (0.1, 0.0)}
 
 obs_vec = wp.types.vector(length=N_OBS, dtype=wp.float32)
 
@@ -63,6 +66,7 @@ def observe_kernel(state: wp.array(dtype=vec13), prev: wp.array(dtype=vec13), bu
     for j in range(5):
         jj = wp.clamp(idx + int(wp.float32(j) * wp.float32(10.0) / ds), 0, npts - 1)
         o[11 + j] = track_k[tid, jj]
+    o[16] = x[4]
     for c in range(N_OBS):
         if sig[c] > wp.float32(0.0):
             o[c] = o[c] + sig[c] * wp.randn(st)

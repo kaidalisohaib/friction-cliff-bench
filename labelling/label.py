@@ -5,8 +5,9 @@ Pipeline for a split file:
   2. W-PD (the prefix path follower continuing, no friction information) once, and O-R with N seeds
   3. O-C only where every O-R seed failed (the label of an O-R success does not depend on O-C), until the first
      O-C success (one witness is enough) or N seeds
-  4. labels by precedence: reactive-feasible > preview-required > certified-infeasible > undetermined;
-     flag certified-reactive-infeasible; marginal sub-band from the best O-R seed's clearance (prereg V3)
+  4. labels by precedence: reactive-feasible (O-R or W-PD, A4.3) > preview-required > certified-infeasible
+     (certificate at v_eff, A4.2) > undetermined; flags certified-reactive-infeasible, adaptation-required
+     (reactive-feasible and W-PD fails, A4.5), marginal (best O-R seed's clearance < 0.30 m, prereg V3)
   5. gate S1 per run at the run's actual arrival state (prereg A3)
 Records are JSON lines with the config hash and git SHA (EVAL_PROTOCOL.md §4).
 """
@@ -27,6 +28,7 @@ from control.episode import (T_AFTER_DROP_INF, T_AFTER_EXIT, T_HANDOVER, prefix_
                              speed_profile)
 from control.mppi import MPPIConfig
 from feasibility.certificate import certify_scenario
+from scenarios.sampler import A_LAT_FRAC, v_eff
 from sim.params import VehicleParams, fingerprint
 from sim.warp_sim import ScenarioSim
 
@@ -55,7 +57,7 @@ def batches(scs, size):
     return [order[i:i + size] for i in range(0, len(order), size)]
 
 
-def run_method(scs, snap, method, seeds, cfg: MPPIConfig, tracks, p, device, batch, log=None):
+def run_method(scs, snap, method, seeds, cfg: MPPIConfig, tracks, p, device, batch, log=None, v_ref=None):
     """All (scenario, seed) runs of one method. Returns {sid: [RunRecord per seed]}."""
     out = {sc.sid: [] for sc in scs}
     for seed in seeds:
@@ -63,7 +65,8 @@ def run_method(scs, snap, method, seeds, cfg: MPPIConfig, tracks, p, device, bat
             sub = [scs[i] for i in idx]
             ssnap = {k: v[idx] for k, v in snap.items()}
             sim = ScenarioSim(sub, p, tracks, device)
-            recs = run_episodes(sub, ssnap, mppi_controller(sim, method, cfg, seed, ssnap), method, seed, tracks, p,
+            vr = None if v_ref is None else np.asarray(v_ref)[idx]
+            recs = run_episodes(sub, ssnap, mppi_controller(sim, method, cfg, seed, ssnap, vr), method, seed, tracks, p,
                                 device, sim=sim)
             for r in recs:
                 out[r.sid].append(r)
@@ -72,14 +75,14 @@ def run_method(scs, snap, method, seeds, cfg: MPPIConfig, tracks, p, device, bat
     return out
 
 
-def run_pd_witness(scs, snap, tracks, p, device, batch):
+def run_pd_witness(scs, snap, tracks, p, device, batch, a_lat_frac=A_LAT_FRAC):
     """W-PD: the deterministic prefix path follower keeps driving after handover (no friction information at all).
     A success is a witness of feasibility without preview (D20, proposed)."""
     out = {}
     for idx in batches(scs, batch):
         sub = [scs[i] for i in idx]
         ssnap = {k: v[idx] for k, v in snap.items()}
-        prof = [speed_profile(tracks[s.track_id], s.v0, s.mu0) for s in sub]
+        prof = [speed_profile(tracks[s.track_id], s.v0, s.mu0, a_lat_frac) for s in sub]
 
         def ctrl(sim, k, sub=sub, prof=prof):
             return prefix_action(sim.get_frenet(), sim.get_state(), sub, tracks, prof, p)
@@ -109,16 +112,19 @@ def _label(reactive_ok: bool, oc_ok: bool, certified: bool) -> str:
 
 
 def assign_label(sc, or_recs, oc_recs, tracks, p, pd_rec=None) -> dict:
-    """`label`: prereg A3 (witnesses: O-R for reactive, O-C for preview). `label_d20`: proposed D20, where any
-    controller with at most reactive information that survives (here also W-PD) is a reactive witness."""
-    cert = certify_scenario(sc, sc.v0, tracks, p)
+    """`label` (prereg A4.3, D20): reactive witnesses are O-R (>= 1 of N seeds) or W-PD, the friction-blind path
+    follower; preview witness O-C; certificate at the nominal arrival state (speed v_eff, A4.2).
+    `label_or_only`: the A3 rule (O-R is the only reactive witness), logged for comparison."""
+    ve = v_eff(sc)
+    cert = certify_scenario(sc, ve, tracks, p)  # nominal arrival state at v_eff (prereg A4.2)
     or_ok = [r for r in or_recs if r.success]
     oc_ok = [r for r in oc_recs if r.success]
     pd_ok = bool(pd_rec is not None and pd_rec.success)
-    label = _label(bool(or_ok), bool(oc_ok), cert.certified)
-    label_d20 = _label(bool(or_ok) or pd_ok, bool(oc_ok), cert.certified)
-    best_clear = max((r.min_clearance for r in or_recs), default=None)
-    return {"sid": sc.sid, "label": label, "label_d20": label_d20, "pd_success": pd_ok,
+    label = _label(bool(or_ok) or pd_ok, bool(oc_ok), cert.certified)
+    label_or = _label(bool(or_ok), bool(oc_ok), cert.certified)
+    best_clear = max((r.min_clearance for r in or_recs), default=None)  # prereg V3: best O-R seed
+    return {"sid": sc.sid, "v_eff": ve, "label": label, "label_or_only": label_or, "pd_success": pd_ok,
+            "adaptation_required": bool(label == "reactive-feasible" and not pd_ok),
             "certified_nominal": bool(cert.certified), "cert_reason": cert.reason,
             "certified_reactive_infeasible": bool(label == "preview-required" and cert.certified),
             "marginal": bool(label == "reactive-feasible" and best_clear is not None and best_clear < MARGINAL_BAND),
@@ -140,7 +146,7 @@ def label_split(scs, tracks, out_dir: Path, cfg_or: MPPIConfig, cfg_oc: MPPIConf
     t1 = time.time()
     or_runs = run_method(scs, snap, "O-R", seeds, cfg_or, tracks, p, device, batch, log)
     meta["gpu_s_or"] = time.time() - t1
-    # O-C is only needed where no reactive witness exists (O-R; and W-PD, so that label_d20 is also complete)
+    # O-C is only needed where O-R has no success (so that both `label` and `label_or_only` are complete)
     need_oc = [i for i, sc in enumerate(scs) if not any(r.success for r in or_runs[sc.sid])]
     oc_runs = {sc.sid: [] for sc in scs}
     t2 = time.time()
