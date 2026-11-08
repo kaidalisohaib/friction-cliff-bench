@@ -17,6 +17,19 @@ Format per entry: date, phase, hours, what was done, and the verdict for any run
 - Tunable methods (M-B, M-L, P-*): none yet (P3). Harness: `eval/tuning.py` (20 trials / 15 GPU-h).
 
 ## Entries
+
+### 2026-11-08 (later): P2 self-review (tuning split only; engineering checks, not results)
+- **Correction to the entry below:** "S1: 0 violations" is true but vacuous. Re-certifying every tuning run at its
+  logged arrival state: no O-R, O-C or W-PD run arrived in a certified state, so S1 was never exercised.
+- **Speed-cap artefact (D19 × A3):** the prefix caps speed at √(0.7·μ0·g·R). On 21 of 200 tuning scenarios the prefix
+  speed at the drop is below v0. All 3 scenarios certified at v0 are among them, and none is certified at the
+  prefix speed. So the single certified-infeasible label and both certified-reactive-infeasible flags rest on an
+  unreachable state. Also, with v_ref = v0 unreachable, O-R left the road on dry in 4 of 5 seeds on U-00084
+  (25.6 m/s, R50 exit).
+- **RF composition:** W-PD (no friction information) succeeds on 139 of 152 tuning RF scenarios. The pooled-RF H1
+  is dominated by scenarios where adaptation is not needed.
+- Proposed responses (to decide): v_eff for v_ref, the certificate and the strata; an S1 probe set; a K = 16k
+  check on the non-RF tuning scenarios; a pre-declared adaptation-required stratum. Nothing is labelled.
 - **2026-11-08 night (P2, GPU shared with another project's eval):**
   - **Built and tested** (134 CPU tests + GPU slow tests):
     - batched Warp MPPI (rollout = truth sim to 1e-5, AR(1) noise, n_iter, ESS-targeted λ, PD ancillary sample with
