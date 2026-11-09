@@ -45,7 +45,7 @@ class HistEncoder(nn.Module):
 
 
 class ActorCritic(nn.Module):
-    def __init__(self, kind: str, z_dim: int = 8, width: int = 256, init_std: float = 0.3):
+    def __init__(self, kind: str, z_dim: int = 8, width: int = 256, init_std: float = 0.1, init_std_long: float = 0.3):
         super().__init__()
         self.kind, self.z_dim = kind, z_dim
         if kind == "dr":
@@ -56,7 +56,7 @@ class ActorCritic(nn.Module):
             a_in = N_FEAT + z_dim
         self.actor = mlp(a_in, [width, width // 2], 2)
         self.critic = mlp(N_FEAT + N_PRIV + N_PREV, [width, width // 2], 1)
-        self.log_std = nn.Parameter(torch.full((2,), float(np.log(init_std))))
+        self.log_std = nn.Parameter(torch.tensor([float(np.log(init_std)), float(np.log(init_std_long))]))
 
     def z(self, priv, prev):
         x = torch.cat([priv, prev], 1) if self.kind == "teacher_preview" else priv
@@ -75,22 +75,29 @@ class ActorCritic(nn.Module):
 
 @dataclass
 class PPOConfig:
-    lr: float = 3e-4
-    gamma: float = 0.99
+    lr: float = 3e-5
+    gamma: float = 0.995
     lam: float = 0.95
     clip: float = 0.2
     epochs: int = 5
     minibatches: int = 4
-    horizon: int = 32  # rollout steps per env per iteration
+    horizon: int = 64  # rollout steps per env per iteration
     ent_coef: float = 0.0
     vf_coef: float = 1.0
     max_grad: float = 1.0
     reward_scale: float = 0.01
     width: int = 256
-    init_std: float = 0.3
-    n_envs: int = 4096
-    total_steps: int = 50_000_000
+    init_std: float = 0.1  # steering (normalized); 0.1 x 0.55 rad = 3 deg
+    init_std_long: float = 0.15
+    n_envs: int = 8192
+    total_steps: int = 60_000_000
     hist_len: int = 1  # only the student uses history; the env keeps at least 1
+    critic_warmup: int = 30  # PPO iterations with the actor frozen (value function catches up with the BC actor)
+    target_kl: float = 0.005
+    lr_critic: float = 3e-4  # stop an update's epochs early when the approximate KL exceeds this
+    bc_reg: float = 0.0  # weight of a BC term (actor mean vs the path follower) in the PPO loss, decaying linearly
+    bc_reg_end: float = 0.5  # ... to 0 at this fraction of training (D27)
+    bc_steps: int = 2000  # behavior-cloning warm start of the actor on the shared path follower (D27); 0 = off
 
 
 def _inputs(env: FrictionEnv):
@@ -98,21 +105,65 @@ def _inputs(env: FrictionEnv):
     return f.f.clone(), f.priv().clone(), f.preview().clone()
 
 
+def bc_warm_start(ac: "ActorCritic", env: FrictionEnv, steps: int, seed: int, log=print) -> None:
+    """D27: regress the actor mean onto the noise-free shared path-follower action (curvature feedforward + PD,
+    the prefix driver's law), on states visited by that driver with action noise and a random per-episode speed
+    multiplier (control/estimator.py: BehaviorDriver). Same procedure and data distribution for every PPO variant.
+    The friction-blind follower has nothing to say about friction, so this only removes the exploration problem
+    of learning to drive a curve from scratch; PPO then learns everything that depends on friction. The env is
+    reset afterwards."""
+    from control.estimator import BehaviorDriver
+    drv = BehaviorDriver(env, seed + 77)
+    opt = torch.optim.Adam(ac.actor.parameters() if ac.kind == "dr" else
+                           list(ac.actor.parameters()) + list(ac.enc.parameters()), lr=1e-3)
+    t0 = time.time()
+    for it in range(steps):
+        f, pv, pr = _inputs(env)
+        with torch.no_grad():
+            target = drv.law()
+            act = (target + drv.ou).clamp(-1, 1)
+        loss = ((ac.mean(f, pv, pr) - target) ** 2).mean()
+        opt.zero_grad()
+        loss.backward()
+        opt.step()
+        with torch.no_grad():
+            drv.ou = 0.9 * drv.ou + torch.randn_like(drv.ou) * torch.tensor([0.02, 0.08], device=env.dev)
+            _, done, _, info = env.step(act)
+            if info:
+                drv.resample(done)
+        if it % 500 == 0 or it == steps - 1:
+            log(f"[bc] it {it}/{steps} mse {float(loss.detach()):.5f} {time.time() - t0:.0f}s")
+    env._reset(torch.ones(env.n, dtype=torch.bool, device=env.dev))
+
+
 def train_ppo(kind: str, lib: dict, cfg: PPOConfig, seed: int = 0, device: str = "cuda:0", log=print,
-              time_budget_s: float | None = None) -> tuple[ActorCritic, dict]:
+              time_budget_s: float | None = None, env=None) -> tuple[ActorCritic, dict]:
     torch.manual_seed(seed)
-    env = FrictionEnv(lib, cfg.n_envs, cfg.hist_len, device, seed=seed, reward_scale=cfg.reward_scale)
+    if env is None:
+        env = FrictionEnv(lib, cfg.n_envs, cfg.hist_len, device, seed=seed, reward_scale=cfg.reward_scale)
     dev = env.dev
-    ac = ActorCritic(kind, width=cfg.width, init_std=cfg.init_std).to(dev)
-    opt = torch.optim.Adam(ac.parameters(), lr=cfg.lr)
+    ac = ActorCritic(kind, width=cfg.width, init_std=cfg.init_std, init_std_long=cfg.init_std_long).to(dev)
+    drv = None
+    if cfg.bc_steps > 0:
+        bc_warm_start(ac, env, cfg.bc_steps, seed, log)
+    if cfg.bc_reg > 0:
+        from control.estimator import BehaviorDriver
+        drv = BehaviorDriver(env, seed + 99)
+        drv.mult[:] = 1.0
+    a_params = [ac.log_std] + list(ac.actor.parameters()) + (list(ac.enc.parameters()) if ac.kind != "dr" else [])
+    opt = torch.optim.Adam(a_params, lr=cfg.lr)
+    opt_c = torch.optim.Adam(ac.critic.parameters(), lr=cfg.lr_critic)
     n, T = cfg.n_envs, cfg.horizon
     iters = max(1, cfg.total_steps // (n * T))
     hist = {"iter": [], "succ": [], "ret": [], "steps": []}
+    disc = torch.zeros(n, device=dev)  # running discounted return per env (reward normalization)
+    rstat = [0.0, 1.0, 1e-4]  # mean, var, count of the discounted returns
+    best = (-1.0, None, -1)
     win_s, win_r = [], []
     t0 = time.time()
     f, pv, pr = _inputs(env)
     for it in range(iters):
-        buf = {k: [] for k in ("f", "pv", "pr", "a", "logp", "v", "r", "d")}
+        buf = {k: [] for k in ("f", "pv", "pr", "a", "logp", "v", "r", "d", "bc")}
         with torch.no_grad():
             for _ in range(T):
                 mu = ac.mean(f, pv, pr)
@@ -120,7 +171,18 @@ def train_ppo(kind: str, lib: dict, cfg: PPOConfig, seed: int = 0, device: str =
                 a = mu + std * torch.randn_like(mu)
                 logp = (-0.5 * ((a - mu) / std) ** 2 - ac.log_std - 0.5 * np.log(2 * np.pi)).sum(1)
                 v = ac.value(f, pv, pr)
+                buf["bc"].append(drv.law() if drv is not None else mu)
                 r, done, _, info = env.step(a)
+                disc = disc * cfg.gamma + r
+                bm, bv, bc = float(disc.mean()), float(disc.var()), disc.numel()
+                m0, v0, c0 = rstat
+                tot = c0 + bc
+                dlt = bm - m0
+                rstat = [m0 + dlt * bc / tot, (v0 * c0 + bv * bc + dlt ** 2 * c0 * bc / tot) / tot, tot]
+                disc = torch.where(done, torch.zeros_like(disc), disc)
+                r = r / float(np.sqrt(rstat[1]) + 1e-8)
+                if drv is not None and info:
+                    drv.mult[done] = 1.0
                 for k, x in zip(("f", "pv", "pr", "a", "logp", "v", "r", "d"), (f, pv, pr, a, logp, v, r, done.float())):
                     buf[k].append(x)
                 if info:
@@ -142,33 +204,57 @@ def train_ppo(kind: str, lib: dict, cfg: PPOConfig, seed: int = 0, device: str =
         flat["adv"], flat["ret"] = adv.reshape(-1), ret.reshape(-1)
         N = T * n
         mb = N // cfg.minibatches
+        warm = it < cfg.critic_warmup
+        stop = False
+        for g in opt.param_groups:
+            g["lr"] = cfg.lr * max(0.0, 1.0 - max(it - cfg.critic_warmup, 0) / max(iters - cfg.critic_warmup, 1))
         for _ in range(cfg.epochs):
+            if stop:
+                break
             perm = torch.randperm(N, device=dev)
             for i in range(cfg.minibatches):
                 j = perm[i * mb:(i + 1) * mb]
                 mu = ac.mean(flat["f"][j], flat["pv"][j], flat["pr"][j])
                 logp = (-0.5 * ((flat["a"][j] - mu) / ac.log_std.exp()) ** 2 - ac.log_std - 0.5 * np.log(2 * np.pi)).sum(1)
-                ratio = (logp - flat["logp"][j]).exp()
+                lr_ = logp - flat["logp"][j]
+                ratio = lr_.exp()
+                kl = float(((ratio - 1) - lr_).mean().detach())
+                if not warm and kl > cfg.target_kl:
+                    stop = True
+                    break
                 ad = flat["adv"][j]
                 ad = (ad - ad.mean()) / (ad.std() + 1e-8)
                 pl = -torch.min(ratio * ad, ratio.clamp(1 - cfg.clip, 1 + cfg.clip) * ad).mean()
                 vl = ((ac.value(flat["f"][j], flat["pv"][j], flat["pr"][j]) - flat["ret"][j]) ** 2).mean()
                 ent = (ac.log_std + 0.5 * np.log(2 * np.pi * np.e)).sum()
-                loss = pl + cfg.vf_coef * vl - cfg.ent_coef * ent
+                loss = cfg.vf_coef * vl if warm else pl + cfg.vf_coef * vl - cfg.ent_coef * ent
+                if drv is not None and not warm:
+                    frac = max(0.0, 1.0 - it / max(cfg.bc_reg_end * iters, 1.0))
+                    loss = loss + cfg.bc_reg * frac * ((mu - flat["bc"][j]) ** 2).sum(1).mean()
                 opt.zero_grad()
+                opt_c.zero_grad()
                 loss.backward()
-                nn.utils.clip_grad_norm_(ac.parameters(), cfg.max_grad)
-                opt.step()
+                nn.utils.clip_grad_norm_(a_params, cfg.max_grad)
+                nn.utils.clip_grad_norm_(ac.critic.parameters(), cfg.max_grad)
+                if not warm:
+                    opt.step()
+                opt_c.step()
         if it % 10 == 0 or it == iters - 1:
             s = float(np.mean(win_s)) if win_s else float("nan")
             rr = float(np.mean(win_r)) if win_r else float("nan")
             hist["iter"].append(it), hist["succ"].append(s), hist["ret"].append(rr), hist["steps"].append((it + 1) * n * T)
             log(f"[{kind}] it {it}/{iters} steps {(it + 1) * n * T / 1e6:.1f}M train-success {s:.3f} return {rr:.1f} "
                 f"std {ac.log_std.exp().tolist()} {time.time() - t0:.0f}s")
+            if not warm and len(win_s) >= 500 and s > best[0]:
+                best = (s, {k: v.detach().clone() for k, v in ac.state_dict().items()}, it)
             win_s, win_r = [], []
         if time_budget_s and time.time() - t0 > time_budget_s:
             log(f"[{kind}] time budget reached at it {it}")
             break
+    if best[1] is not None:
+        ac.load_state_dict(best[1])  # best training-window checkpoint (training episodes only)
+        log(f"[{kind}] kept checkpoint of it {best[2]} (train-success {best[0]:.3f})")
+    hist["best_succ"], hist["best_it"] = best[0], best[2]
     hist["wall_s"] = time.time() - t0
     return ac, hist
 
@@ -232,8 +318,8 @@ def distill(teacher: ActorCritic, lib: dict, cfg: DistillConfig, seed: int = 0, 
         opt.step()
         if it % 50 == 0 or it == iters - 1:
             s = float(np.mean(win_s)) if win_s else float("nan")
-            hist["iter"].append(it), hist["loss"].append(float(loss)), hist["succ"].append(s)
-            log(f"[student] it {it}/{iters} loss {float(loss):.4f} train-success {s:.3f} {time.time() - t0:.0f}s")
+            hist["iter"].append(it), hist["loss"].append(float(loss.detach())), hist["succ"].append(s)
+            log(f"[student] it {it}/{iters} loss {float(loss.detach()):.4f} train-success {s:.3f} {time.time() - t0:.0f}s")
             win_s = []
         if time_budget_s and time.time() - t0 > time_budget_s:
             break

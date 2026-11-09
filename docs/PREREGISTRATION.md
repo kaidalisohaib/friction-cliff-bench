@@ -173,3 +173,44 @@ is unchanged.
   state; else undetermined. A preview-required scenario that is also certified at the nominal arrival state carries
   the flag *certified-reactive-infeasible* (proven to need preview). Because of S1, O-R can succeed in a
   certified scenario only by arriving in a non-certified state, and such runs are listed for inspection.
+
+### A4 (2026-11-08): episode handover, effective speed, witnesses, oracle settings, information, tuning blocks (D19–D27)
+Decided in-session,
+2026-11-08). Adopted **before any test-split scenario was labelled or evaluated**. Everything below was chosen on the
+tuning split only. Rationale: `DECISIONS.md` D19–D27 and the LOG entries of 2026-11-08.
+- **A4.1 Handover (D19).** Every scenario is driven from s = 0 by the shared deterministic dry driver
+  (`control/episode.py: prefix_action`; curvature feedforward + PD; speed profile at 0.7·μ0·g lateral, 0.4 g
+  braking) until the front axle is 4.0 s (at the current speed) from the drop. That state is the common starting
+  state of every method. Episode end, success and termination are unchanged.
+- **A4.2 Effective reference speed (D19).** v_eff = min(v0, √(0.7·μ0·g·R)) (v_eff = v0 on the straight).
+  - v_eff replaces v0 as the objective's v_ref (DESIGN §4) and as the speed of the certificate's nominal arrival
+    state (refines A3: "certified-infeasible" = certified at v_eff, on the centreline).
+  - Figures use v_eff; v0 stays the sampled cell value and is reported too.
+- **A4.3 Reactive witnesses (D20).** Reactive-feasible = O-R succeeds in ≥ 1 of 5 seeds, **or** W-PD succeeds. W-PD
+  is the shared dry driver continuing after handover, with no friction information. The O-R-only label (A3) is
+  logged as `label_or_only`. O-R remains the regret reference.
+- **A4.4 Oracle settings (D21, D22).** H = 150 steps (3 s), σ = (0.05, 0.3), λ = 10 (fixed), ancillary PD sample,
+  5 seeds. O-R: ρ = 0, current true per-axle surfaces. O-C: ρ = 0.9, true friction field. O-C runs only where O-R
+  has no success, until its first success. **K = 1024**. K-check per D22: O-R and O-C rerun at K = 16384 on the 43 tuning scenarios that are not reactive-feasible at K = 1024. 2 became reactive-feasible (31 stayed preview-required, 10 undetermined), within the pre-set rule (≤ 2), so K = 1024 is kept. Read: about 5% of non-RF labels may reflect oracle compute rather than physics; the report states this.
+  This replaces "≈ 16k samples" in V7; the test-pool compute is reported with the labels.
+- **A4.5 Adaptation-required stratum (D22 in the review; pre-declared here).** Reactive-feasible scenarios where
+  W-PD fails. H1 is unchanged (pooled reactive-feasible headline). The same H1 test (TOST at ±5 pp, the same
+  statistics) is also reported on this stratum, with equal prominence, as a **pre-declared secondary analysis**
+  (not in the Holm family).
+- **A4.6 S1 probe (D23).** In addition to S1 on every labelled run, S1 is run on the probe set
+  (`scripts/s1_probe.py`, own seed 1423445753, 96 scenarios, not part of any split). It must have ≥ 30 runs
+  arriving in a certified state and none of them succeeding.
+- **A4.7 Second tuning block.** `splits/tuning_v1_b2.jsonl`, 200 scenarios, seed
+  int(sha256("friction-cliff-bench tuning split v1 block 2")[:8], 16) = 3838336887, SHA-256
+  42fac623f33c41b2b4caa26746951a6deec18e84f5a034ec6abd77b3b28f1862. Tuning and S2 use both tuning blocks, because
+  S2 needs ≥ 200 reactive-feasible tuning scenarios (V5). It shares no instance with the test blocks (checked in CI).
+- **A4.8 Information (D24).** Every MPPI method starts its rollouts from the true vehicle state (perfect state
+  estimation). Non-privileged methods observe the channels of `sim/observe.py`, which now include a noisy lateral
+  velocity (0.1 m/s). Observation noise levels: `PARAMETERS.md` §7.
+- **A4.9 Learned-method details (D25–D27).**
+  - DR randomizes only the per-axle lateral B scale (±15%) for tire shape.
+  - Own PPO.
+  - Every PPO actor is warm-started by behavior cloning the friction-blind shared dry driver.
+  - Budget split: P-S = 14 teacher + 6 student trials (P-SP likewise); P-DR, M-B and M-L get 20 trials each. The
+    V2 GPU-hour cap applies pro rata.
+  - History windows: W ∈ {5, 12, 25, 50} control steps for every adaptive method.

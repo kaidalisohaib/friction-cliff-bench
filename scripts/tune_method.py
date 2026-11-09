@@ -53,10 +53,11 @@ def mppi_space(trial):
 
 
 def ppo_space(trial):
-    return {"lr": trial.suggest_float("lr", 1e-4, 1e-3, log=True),
-            "init_std": trial.suggest_float("init_std", 0.1, 0.5),
-            "reward_scale": trial.suggest_float("reward_scale", 0.002, 0.03, log=True),
-            "gamma": trial.suggest_categorical("gamma", [0.98, 0.99, 0.995]),
+    return {"lr": trial.suggest_float("lr", 1e-5, 1e-4, log=True),
+            "init_std": trial.suggest_float("init_std", 0.03, 0.15, log=True),
+            "init_std_long": trial.suggest_float("init_std_long", 0.05, 0.3, log=True),
+            "reward_scale": trial.suggest_float("reward_scale", 0.003, 0.03, log=True),
+            "gamma": trial.suggest_categorical("gamma", [0.99, 0.995, 0.998]),
             "width": trial.suggest_categorical("width", [128, 256])}
 
 
@@ -110,7 +111,8 @@ def main():
             val, _ = evaluate(fac, m)
         elif m in ("P-T", "P-TP", "P-DR"):
             kind = {"P-T": "teacher", "P-TP": "teacher_preview", "P-DR": "dr"}[m]
-            cfg = PPOConfig(lr=params["lr"], init_std=params["init_std"], reward_scale=params["reward_scale"],
+            cfg = PPOConfig(lr=params["lr"], init_std=params["init_std"], init_std_long=params["init_std_long"],
+                            reward_scale=params["reward_scale"],
                             gamma=params["gamma"], width=params["width"], total_steps=PPO_STEPS)
             ac, hist = train_ppo(kind, lib, cfg, seed=0, device=a.device, log=log)
             save_policy(OUT / f"{tag}.pt", ac, {"kind": kind, "cfg": asdict(cfg), "params": params})

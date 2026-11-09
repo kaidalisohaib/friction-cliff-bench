@@ -152,3 +152,73 @@ K-check: K = 4096 changed 2 of 200 labels (one each way). Projected test-pool la
 GPU. Also proposes the observation-noise levels (`PARAMETERS.md` §7). Becomes prereg amendment A4 once approved;
 nothing in the test pool is labelled before that.
 
+
+## D19–D21 resolved. DECIDED 2026-11-08 (in-session
+- **D19 handover: approved with the v_eff fix.** The P2 self-review (LOG 2026-11-08) found that v0 is unreachable
+  on dry road in about 10% of cells. A scenario's effective reference speed is therefore
+  v_eff = min(v0, √(0.7·μ0·g·R)) (`scenarios/sampler.py: v_eff`). v_eff is the objective's v_ref, the
+  certificate's nominal arrival speed, and the speed axis of figures. v0 stays the sampled cell value.
+  Rejected alternative: dropping those cells, which would edit the frozen pool.
+- **D20 W-PD witness: approved.** It is a sound existence proof. The official `label` counts W-PD, and
+  `label_or_only` (the A3 rule) is logged next to it.
+- **D21 oracle settings: approved after the K = 16k check** on the non-RF tuning scenarios (D22). Result and
+  final K: prereg A4.4.
+
+## D22: K = 16k check before freezing the oracle K. DECIDED 2026-11-08
+"Preview-required" only means "O-R failed N times", so a weak O-R inflates that class. Before freezing K, O-R and
+O-C are rerun at K = 16384 (the prereg V7 number) on every tuning scenario that is not reactive-feasible at
+K = 1024.
+- Rule fixed in advance: if 16k turns at most 2 of them reactive-feasible, keep K = 1024.
+- Otherwise freeze the larger K, if the test-pool compute stays ≤ 12 GPU-h; if not, freeze 4096.
+
+## D23: S1 probe set. DECIDED 2026-11-08
+`scripts/s1_probe.py`: 96 apex snow/ice scenarios from their own seed, not part of any split. A dry driver at
+0.9·μ0·g carries cars into the drop fast, and W-PD, O-R and M-N (2 seeds) run on them. S1 passes only if at least
+30 runs arrive in a certified state and none of those succeeds.
+- First run 2026-11-08: 480 runs, 278 certified arrivals, 0 successes → PASS. This is engineering, not a result.
+- The probe is rerun with every labelling run.
+
+## D24: State information for MPPI methods; vy in the observations. DECIDED 2026-11-08
+All MPPI methods (O-R, O-C, M-N, M-B, M-L) start their rollouts from the true vehicle state. This is perfect state
+estimation, as in LLA-MPC; state estimation is out of scope.
+- The adaptive MPPIs infer friction and delay only from the noisy observation history.
+- So that the policies are not disadvantaged on sideslip, every non-privileged method also observes a noisy
+  lateral velocity vy (0.1 m/s; `PARAMETERS.md` §7).
+- The residual asymmetry (MPPI sees the exact rest of the state) favours the MPPI side. The report states it.
+
+## D25: Domain randomization of tire shape. DECIDED 2026-11-08
+BASELINES §4 says "tire shape (B, C, E) ±15%". The simulator exposes only a per-axle B scale as a per-car
+parameter, so training DR randomizes B_scale_f and B_scale_r independently by ±15%; C and E are not randomized.
+The other DR ranges are as written.
+
+## D26: Own minimal PPO instead of rsl-rl-lib; RL arm details. DECIDED 2026-11-08
+`rl/ppo.py` is a small PPO (GAE, clipped objective, asymmetric critic) on the GPU env `rl/env.py`. Reasons: it
+avoids a pinned dependency and its API churn, keeps everything zero-copy with Warp on one CUDA stream, and every
+line is tested and explainable.
+- Reward = −(V1 objective with the exact footprint violation) · reward_scale, with −C_fail on termination. No
+  shaping.
+- Time-limit truncations are treated as terminal. The episode end is a calm post-patch drive, so the bias is
+  small.
+- Teacher latent z is 8-dimensional. The student is a GRU over the W-step feature history; its z is regressed onto
+  the teacher's z with the actor frozen, on the student's own rollouts.
+- Budget split inside P-S (and P-SP): 14 teacher trials + 6 student trials = 20 trials, and GPU-h pro rata.
+  P-DR, M-B and M-L get 20 trials each.
+- Each PPO trial is fixed at 60M environment steps.
+- Allowed history windows for every adaptive method (P-S, P-SP, M-B, M-L): W ∈ {5, 12, 25, 50} steps
+  (0.1–1.0 s, the E1 set), tuned within each method's budget (prereg V8: "W tuned within the shared allowed set").
+- M-B and M-L use the oracles' MPPI compute (K = 1024, H = 150) and tune σ, λ, ρ and W. M-N gets the best M-B
+  MPPI settings (V2).
+
+## D27: Behavior-cloning warm start for every PPO actor. DECIDED 2026-11-08
+Found in P3 pilots, which ran on the training library only: PPO from scratch never completed an episode in 21M
+steps. The cause is the objective itself. Once the car is off-centre, the lane-violation cost (up to 100 per step)
+makes crashing early cheaper than surviving, so random exploration never learns to drive a curve.
+- The same GPU env driven by the friction-blind path-follower law succeeds in 66% of training episodes. So the env
+  is solvable and the issue is exploration.
+- Fix: before PPO, every actor (P-T, P-TP, P-DR; the students inherit their teacher's actor) is regressed for 2,000
+  steps onto the noise-free shared path follower, on states that follower visits with action noise
+  (`rl/ppo.py: bc_warm_start`). Then PPO trains with the unchanged V1 reward.
+- The follower has no friction information, so the warm start teaches lane keeping only. All friction adaptation
+  is learned by PPO.
+- Identical for every PPO variant, so it is not a fairness asymmetry; the MPPI side gets the same follower as its
+  ancillary sample (D20/P2). Disclosed in the report.

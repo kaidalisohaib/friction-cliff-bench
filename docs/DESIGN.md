@@ -106,7 +106,7 @@ plough), and (b) offer *structural* mismatch axes for H2.
 Per control step: `c = w_lane·lane_violation² + w_ey·e_y² + w_v·(vx − v_ref)²/v_ref² + w_du·‖Δu‖² − w_prog·Δs`,
 plus a terminal/termination penalty `C_fail` on departure or loss of control.
 - `lane_violation` = distance of the furthest footprint corner beyond the lane edge (0 inside the lane).
-- `v_ref` = entry speed. Controllers are *allowed* to slow down; the speed term is soft.
+- `v_ref` = entry speed, capped at what dry road allows in the curve: v_eff = min(v0, √(0.7·μ0·g·R)) (prereg A4.2, D19). Controllers are *allowed* to slow down; the speed term is soft.
 - **Weights (prereg V1):** w_ey = 1.0 m⁻², w_lane = 100 m⁻², w_v = 2.0, w_du = 0.1 (u normalized to [-1, 1]),
   w_prog = 0.1 m⁻¹, C_fail = 2000; per 20 ms control step.
 - Weights are fixed once, before tuning, and are **not** a tuned hyperparameter of any method. PPO-only shaping
