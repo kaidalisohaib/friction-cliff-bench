@@ -22,3 +22,17 @@ def test_gpu_hour_budget_binds_first(tmp_path):
     # 1 GPU-hour per trial, 3.5 h cap: the 4th trial would exceed it, so 3 run
     res = tune("toy", lambda p: (p["x"] ** 2, 3600.0), _space, tmp_path / "l.jsonl", n_trials=20, gpu_hours=3.5)
     assert res.n_trials == 3 and res.stopped_by == "gpu_hours"
+
+
+def test_tuning_resumes_from_ledger(tmp_path):
+    import optuna
+    from eval.tuning import tune
+    space = lambda t: {"x": t.suggest_float("x", -1.0, 1.0), "c": t.suggest_categorical("c", [1, 2])}
+    calls = []
+    obj = lambda p: (calls.append(p) or (p["x"] ** 2, 1.0))
+    led = tmp_path / "ledger.jsonl"
+    r1 = tune("m", obj, space, led, n_trials=3)
+    assert r1.n_trials == 3 and len(calls) == 3
+    r2 = tune("m", obj, space, led, n_trials=5)
+    assert r2.n_trials == 5 and len(calls) == 5  # only 2 new evaluations
+    assert r2.best_value <= r1.best_value

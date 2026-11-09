@@ -1,0 +1,17 @@
+{
+ "method": "M-B",
+ "best_params": {
+  "sigma_steer": 0.07434072053074224,
+  "sigma_long": 0.3193007567311602,
+  "lam": 94.78675948634677,
+  "rho": 0.5,
+  "W": 5
+ },
+ "best_value": 0.03937459283387622,
+ "n_trials": 20,
+ "gpu_hours": 2.810914164582888,
+ "stopped_by": "trials",
+ "tag": "M-B_1794188070",
+ "n_tuning_rf": 307,
+ "git": "91eb906bf04ae042e60912b3d32c52058467a8f9"
+}

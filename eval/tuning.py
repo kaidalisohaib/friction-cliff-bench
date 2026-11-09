@@ -35,12 +35,26 @@ class TuneResult:
 def tune(method: str, objective: Callable[[dict], tuple[float, float]], space: Callable[[optuna.Trial], dict],
          ledger: Path, n_trials: int = N_TRIALS, gpu_hours: float = GPU_HOURS, seed: int = 0,
          git: str = "unknown") -> TuneResult:
-    """objective(params) -> (value to minimize, GPU-seconds used). space(trial) -> params dict."""
+    """objective(params) -> (value to minimize, GPU-seconds used[, extra dict stored in the ledger line]).
+    space(trial) -> params dict. Finished trials of `method` already in the ledger are replayed (resume)."""
     ledger.parent.mkdir(parents=True, exist_ok=True)
     study = optuna.create_study(direction="minimize", sampler=optuna.samplers.TPESampler(seed=seed))
     used = 0.0
     done = 0
     stopped_by = "trials"
+    # resume: replay this method's finished trials from the ledger into the study (same params, same values),
+    # so the TPE history and the trial/GPU-hour budget carry over after an interruption
+    if ledger.exists():
+        for line in ledger.read_text().splitlines():
+            rec = json.loads(line)
+            if rec["method"] != method:
+                continue
+            study.enqueue_trial(rec["params"])
+            trial = study.ask()
+            space(trial)
+            study.tell(trial, rec["value"])
+            used += rec["gpu_s"]
+            done += 1
     while done < n_trials:
         if done > 0 and used + used / done > gpu_hours * 3600.0:
             stopped_by = "gpu_hours"
@@ -48,11 +62,13 @@ def tune(method: str, objective: Callable[[dict], tuple[float, float]], space: C
         trial = study.ask()
         params = space(trial)
         t0 = time.time()
-        value, gpu_s = objective(params)
+        out = objective(params)
+        value, gpu_s = out[0], out[1]
+        extra = out[2] if len(out) > 2 else {}
         study.tell(trial, value)
         used += gpu_s
         done += 1
         with open(ledger, "a") as f:
             f.write(json.dumps({"method": method, "trial": trial.number, "params": params, "value": value,
-                                "gpu_s": gpu_s, "wall_s": time.time() - t0, "git": git}) + "\n")
+                                "gpu_s": gpu_s, "wall_s": time.time() - t0, "git": git, **extra}) + "\n")
     return TuneResult(study.best_params, float(study.best_value), done, used / 3600.0, stopped_by)

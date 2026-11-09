@@ -203,7 +203,7 @@ line is tested and explainable.
   the teacher's z with the actor frozen, on the student's own rollouts.
 - Budget split inside P-S (and P-SP): 14 teacher trials + 6 student trials = 20 trials, and GPU-h pro rata.
   P-DR, M-B and M-L get 20 trials each.
-- Each PPO trial is fixed at 60M environment steps.
+- Each PPO trial is fixed at 200M environment steps (raised from 60M after pilot G, LOG 2026-11-08).
 - Allowed history windows for every adaptive method (P-S, P-SP, M-B, M-L): W ∈ {5, 12, 25, 50} steps
   (0.1–1.0 s, the E1 set), tuned within each method's budget (prereg V8: "W tuned within the shared allowed set").
 - M-B and M-L use the oracles' MPPI compute (K = 1024, H = 150) and tune σ, λ, ρ and W. M-N gets the best M-B

@@ -90,7 +90,7 @@ class PPOConfig:
     init_std: float = 0.1  # steering (normalized); 0.1 x 0.55 rad = 3 deg
     init_std_long: float = 0.15
     n_envs: int = 8192
-    total_steps: int = 60_000_000
+    total_steps: int = 200_000_000
     hist_len: int = 1  # only the student uses history; the env keeps at least 1
     critic_warmup: int = 30  # PPO iterations with the actor frozen (value function catches up with the BC actor)
     target_kl: float = 0.005

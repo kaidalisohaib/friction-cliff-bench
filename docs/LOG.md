@@ -14,9 +14,57 @@ Format per entry: date, phase, hours, what was done, and the verdict for any run
 ## Tuning ledger (per method: trials, GPU-h, human-h)
 - Oracles (not a tuned method; settings pilot on the tuning split, FEASIBILITY §3): 24 grid configs on 40 scenarios +
   K-check (2 × 200 scenarios × 5 seeds) + 2 hard-case variant scans; ≈ 1.0 GPU-h of oracle runs (shared GPU). Logs in `runs/`.
-- Tunable methods (M-B, M-L, P-*): none yet (P3). Harness: `eval/tuning.py` (20 trials / 15 GPU-h).
+- Tunable methods (2026-11-08, paused; GPU-h = wall time on a GPU shared between jobs, which over-counts):
+  - M-B: 20/20 trials, 2.81 GPU-h, done;
+  - M-L: 14/20, 3.06 GPU-h;
+  - P-T: 1/14, 1.26 GPU-h;
+  - P-DR: 0/20.
+  Line by line: `ledgers/tuning_ledger.jsonl`.
+  PPO pilots before tuning (not counted in any method's budget, which is a design pilot like the oracle pilot):
+  ≈ 1.5 GPU-h.
 
 ## Entries
+
+### 2026-11-08 late: run paused (GPU needed for another project)
+- Every job was stopped cleanly at about 23:00.
+- **Test-pool labelling had not finished and left no output**, so it must be rerun. No test label exists, and no
+  test scenario has been evaluated by any method.
+- Tuning is resumable: `eval/tuning.py` now replays finished trials from the ledger (tested), and the ledger stores
+  each trial's checkpoint tag.
+- M-B tuning is complete, M-L is at 14/20, and P-T has 1 trial. To resume, rerun the same tuning commands.
+
+### 2026-11-08 evening: long run, G2 → P3; engineering checks, not results
+- **Decisions D19–D27, prereg A4** (see DECISIONS).
+  - Every check below used tuning/training data only.
+  - The test pool was labelled only after A4 was committed (997a231), with the frozen settings.
+- **v_eff:** tuning block 1 relabelled. Prediction: the 3 previously certified scenarios lose certification and
+  the dry-road O-R failure goes away → **confirmed**.
+  - RF 157 / PR 32 / UD 11 / CI 0.
+  - S1: 0 violations.
+  - The W-PD witness no longer changes any label.
+  - Adaptation-required: 17.
+- **S1 probe:** prediction "≥ 30 certified arrivals, 0 survivors" → **confirmed**.
+  - 480 runs, 278 certified arrivals, 0 survivors.
+- **Tuning block 2** (200, new seed, hashed): RF 150 / PR 39 / UD 10 / CI 1, S1 0.
+  - With both blocks there are 307 RF tuning scenarios, enough for S2's ≥ 200.
+- **K = 16k check** on the 43 non-RF block-1 scenarios: 2 → RF, within the pre-set rule, so K = 1024 is frozen.
+- **S2 reference** on the 307 RF tuning scenarios (5 O-R seeds, 1,535 runs):
+  - O-R departure 0.037, so the S2 threshold is 0.087;
+  - W-PD departure 0.143.
+- **PPO pilots** (training library):
+  - from scratch: 0 successes in 21M steps;
+  - BC warm start, then PPO: collapses as soon as the actor updates. With the actor frozen it stays at ~0.5
+    train success, and a toy test shows the PPO update is correct;
+  - large batch with low lr and small KL: peaks at 0.69, then collapses;
+  - + separate actor/critic optimizers, return normalization, linear LR decay, best training checkpoint
+    (pilot F, 60M steps): ends at 0.68 train success, and 0.778 success / 0.221 departure on the 307 RF tuning
+    scenarios. Far from the S2 threshold.
+  - **Pilot G** (same settings, 200M steps; best training checkpoint at it 360, train-success 0.90 under
+    exploration noise and DR): **0.990 success / 0.010 departure** on the 307 RF tuning scenarios, which is below
+    O-R's 0.037. Longer training was the missing piece, so PPO trials are fixed at 200M steps (D26 updated here).
+- **M-L estimator** (W = 25, first trial): μ MAE ≈ 0.07, surface accuracy ≈ 0.8. Extra-delay accuracy stays at
+  chance (≈ 0.36 for 3 classes): 0–40 ms of extra delay is not identifiable from these observations by this
+  estimator.
 
 ### 2026-11-08 (later): P2 self-review (tuning split only; engineering checks, not results)
 - **Correction to the entry below:** "S1: 0 violations" is true but vacuous. Re-certifying every tuning run at its

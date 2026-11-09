@@ -62,6 +62,13 @@ class BehaviorDriver:
         self.ou[mask] = 0
 
     def act(self):
+        a = self.law()
+        self.ou = 0.9 * self.ou + torch.randn(self.n, 2, device=self.env.dev, generator=self.g) * torch.tensor(
+            [0.02, 0.08], device=self.env.dev)
+        return (a + self.ou).clamp(-1, 1)
+
+    def law(self):
+        """Noise-free path-follower action on the true state (with this episode's speed multiplier)."""
         s, env, p = self.env.sim, self.env, self.p
         x = wp.to_torch(s.state).view(self.n, 13)
         fr = wp.to_torch(s.frenet).view(self.n, 2)
@@ -75,10 +82,7 @@ class BehaviorDriver:
         ka = self.kap[tid, ia].abs().clamp(min=1e-9)
         mu0 = env.feat.prof[:, 3]
         vt = torch.minimum(env.feat.v_ref * self.mult, torch.sqrt(0.7 * mu0 * G / ka) * self.mult)
-        self.ou = 0.9 * self.ou + torch.randn(self.n, 2, device=env.dev, generator=self.g) * torch.tensor(
-            [0.02, 0.08], device=env.dev)
-        a = torch.stack([(delta / p.delta_max).clamp(-1, 1), (0.3 * (vt - x[:, 3])).clamp(-1, 1)], 1) + self.ou
-        return a.clamp(-1, 1)
+        return torch.stack([(delta / p.delta_max).clamp(-1, 1), (0.3 * (vt - x[:, 3])).clamp(-1, 1)], 1)
 
 
 def train_estimator(lib: dict, hist_len: int, steps: int = 3000, n_envs: int = 4096, lr: float = 1e-3,

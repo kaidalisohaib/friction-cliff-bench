@@ -39,7 +39,7 @@ from rl.ppo import DistillConfig, PPOConfig, distill, save_policy, train_ppo
 OUT = Path("runs/tuning")
 LIB = Path("runs/rl/lib_train_v1.npz")
 W_SET = (5, 12, 25, 50)  # allowed history windows [control steps] = {0.1, 0.25, 0.5, 1.0} s (prereg E1 set)
-PPO_STEPS = 60_000_000
+PPO_STEPS = 200_000_000
 DISTILL_STEPS = 15_000_000
 SPLIT_BUDGET = {"P-T": 14, "P-S": 6, "P-TP": 14, "P-SP": 6}
 
@@ -144,15 +144,13 @@ def main():
             d["hidden"] = trial.suggest_categorical("hidden", [32, 64, 128])
             return d
 
-    tags = {}
-
     def obj_tagged(params):
         v, g = obj(params)
-        tags[json.dumps(params, sort_keys=True)] = obj.last_tag
-        return v, g
+        return v, g, {"tag": obj.last_tag}
 
     res = tune(m, obj_tagged, space, OUT / "ledger.jsonl", n_trials=n_trials, gpu_hours=gpu_h, seed=0, git=git_sha())
-    best_tag = tags.get(json.dumps({k: res.best_params[k] for k in res.best_params}, sort_keys=True))
+    led = [json.loads(x) for x in (OUT / "ledger.jsonl").read_text().splitlines()]
+    best_tag = next((r.get("tag") for r in led if r["method"] == m and r["value"] == res.best_value), None)
     rec = {"method": m, "best_params": res.best_params, "best_value": res.best_value, "n_trials": res.n_trials,
            "gpu_hours": res.gpu_hours, "stopped_by": res.stopped_by, "tag": best_tag,
            "n_tuning_rf": len(ev_scs), "git": git_sha()}
