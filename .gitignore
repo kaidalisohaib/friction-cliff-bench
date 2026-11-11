@@ -16,6 +16,7 @@ runs/
 wandb/
 outputs/
 data/
+!mppi_cpp/tests/data/
 *.pt
 *.ckpt
 *.onnx

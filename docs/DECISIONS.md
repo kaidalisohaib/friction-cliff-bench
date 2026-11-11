@@ -234,3 +234,48 @@ PPO run reproduced the same objective exactly, 0.0113, which is how it showed up
   replacement trial; their duplicate lines stay in the ledger.
 - Applies to every method equally (M-B never resumed, so it has 20 distinct configurations already).
 
+## D29: C++17/CUDA MPPI backend: C ABI + ctypes, Warp-identical RNG, S3 tolerances, used for every MPPI method in the confirmatory runs. DECIDED 2026-11-11
+Built in `mppi_cpp/` (BASELINES §5), for the confirmatory runs.
+- **Shared source for CPU and GPU.** The dynamics, track projection, friction field, cost, path follower and every
+  MPPI kernel body are `__host__ __device__` functions (`mppi_cpp/include/fcb/`). The CUDA driver maps them onto
+  threads, and the CPU driver onto loops for GoogleTest. The weights and update steps use block reductions on the
+  GPU when K ≥ 256.
+- **Bindings: a C ABI loaded with ctypes** (`control/mppi_cpp.py`), not nanobind/pybind11 as BASELINES §5
+  suggested. The library reads Warp arrays in place via raw pointers, with no copies, and launches on Warp's
+  current stream. This needs no build-time Python dependency. `CppMPPI` subclasses the Warp `MPPI` and replaces
+  only `act()`.
+- **RNG.** The port copies Warp's PCG hash and Box-Muller normal bit for bit (checked against `wp.randn`). With the
+  same seeds, both backends therefore draw identical samples, and S3's "fixed noise" holds by construction.
+- **S3 tolerances (the prereg names none):**
+  - first control step from identical inputs: the random samples must be bit-identical, the action within 1e-4,
+    the plan within 1e-3;
+  - second step, whose inputs already differ by rounding: action 2e-3, plan 2e-2.
+  - Measured on 1,000 perturbed tuning-handover states (O-R and O-C settings), the first-step action differences
+    were ≤ 1.3e-5. The remaining differences are nvcc-vs-NVRTC rounding; both compile with fused multiply-add on and
+    no fast math.
+- **Closed-loop consequence:** rounding differences grow over an episode. On 32 tuning scenarios, O-R had the same
+  outcome on both backends (32/32), with min clearance differing by up to 4.4 cm. So a comparison must run every
+  method on one backend.
+- **Rule:**
+  - All MPPI-based methods (O-R, O-C, M-N, M-B, M-L) in the confirmatory test-split evaluation use the C++ backend
+    (`MPPI_BACKEND=cpp`), as the project design states.
+  - The P2 feasibility labels stay as computed by the Warp oracles: labelling is not a method comparison, and S3
+    shows the two implement the same controller.
+  - Tuning (already running on Warp) is not redone. The tuned parameters carry over because the controller is the
+    same.
+
+## D30: Evaluation plan fixed before test evaluation (prereg A5). DECIDED 2026-11-11
+What A5 adds to V6/V7/EVAL_PROTOCOL and why:
+- **H2 subset of 500 reactive-feasible scenarios.** The full set would be 9 levels × ~3,000 scenarios × 5 methods
+  × 5 seeds, i.e. hundreds of GPU-hours. With 500 scenarios × 5 seeds, a 5 pp regret difference is resolvable, and
+  every level uses the same instances, so the slope is paired.
+- **"Better of M-B/M-L" chosen on the test set by lower departure.** The alternative was choosing on the tuning
+  objective. Taking the minimum can only shrink (better MPPI − P-S), so it cannot help falsify H1. The tuning-based
+  choice would also have picked M-B (0.039 vs 0.0725), so the two rules usually agree.
+- **Dry set built from the H2 subset by removing the drop.** EVAL_PROTOCOL defines dry pace on "dry-only
+  scenarios" without defining that set. Reusing the H2 instances keeps the pairing, and the geometry and episode
+  timing are unchanged.
+- **p-values in the claimed direction** (1 otherwise), so a wrong-signed effect never counts toward Holm.
+- **Recovery latency** is moved to an exploratory pass. It needs per-step traces of every run, and it is not in
+  the Holm family.
+

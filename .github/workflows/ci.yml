@@ -13,3 +13,11 @@ jobs:
       # CPU-only: skip the torch (rl) group; GPU tests are skipped automatically.
       - run: uv sync --frozen --no-group rl
       - run: uv run --no-group rl pytest -q
+  cpp-cpu:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      # C++17 MPPI library, CPU driver and GoogleTest suite (the CUDA driver and S3 need a GPU; run locally).
+      - run: cmake -S mppi_cpp -B build -DFCB_WITH_CUDA=OFF
+      - run: cmake --build build -j
+      - run: ctest --test-dir build --output-on-failure

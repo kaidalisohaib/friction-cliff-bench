@@ -12,8 +12,9 @@ import hashlib
 import numpy as np
 import warp as wp
 
-from control.mppi import MODE_FIELD, MODE_FIXED, MPPI, MPPIConfig
-from sim.params import DRY, MU_RANGES
+from control.mppi import MODE_FIELD, MODE_FIXED, MPPIConfig
+from control.mppi_cpp import make_mppi
+from sim.params import DRY, MU_RANGES, VehicleParams
 from sim.warp_sim import ScenarioSim, surface_vec
 
 MU_NOMINAL_DRY = 0.5 * sum(MU_RANGES["dry"])
@@ -29,12 +30,14 @@ def run_seed(sid: str, method: str, seed: int) -> int:
     return int(hashlib.sha256(f"{sid}|{method}|{seed}".encode()).hexdigest()[:7], 16)
 
 
-def mppi_controller(sim: ScenarioSim, method: str, cfg: MPPIConfig, seed: int, snap: dict, v_ref=None):
+def mppi_controller(sim: ScenarioSim, method: str, cfg: MPPIConfig, seed: int, snap: dict, v_ref=None,
+                    model_params: VehicleParams | None = None):
     """Build an MPPI controller for `method` in {"O-R", "O-C", "M-N"} on the cars of `sim`; `seed` is the run
     seed index (0..N-1), mapped to a per-scenario noise seed by run_seed()."""
     mode = MODE_FIELD if method == "O-C" else MODE_FIXED
     c = MPPIConfig(**{**cfg.__dict__, "mode": mode})
-    m = MPPI(sim, c, seed=np.array([run_seed(sc.sid, method, seed) for sc in sim.scenarios]), v_ref=v_ref)
+    m = make_mppi(sim, c, seed=np.array([run_seed(sc.sid, method, seed) for sc in sim.scenarios]), v_ref=v_ref,
+                  model_params=model_params)
     m.reset(snap["buf"][:, 0, :])
     if method == "M-N":
         dry = np.broadcast_to(surface_vec(DRY, MU_NOMINAL_DRY), (sim.n, 8))

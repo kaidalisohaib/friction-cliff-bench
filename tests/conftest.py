@@ -3,6 +3,11 @@ import warp as wp
 
 wp.config.quiet = True
 
+try:  # the CPU CI job installs no torch (`uv sync --no-group rl`): skip the learned-method test modules there
+    import torch  # noqa: F401
+except ImportError:
+    collect_ignore = ["test_adaptive.py", "test_ppo.py", "test_rl_env.py"]
+
 
 def has_cuda() -> bool:
     try:

@@ -27,6 +27,41 @@ Format per entry: date, phase, hours, what was done, and the verdict for any run
 
 ## Entries
 
+### 2026-11-11 evening: P4 built (C++/CUDA MPPI, S3), evaluation pipeline + prereg A5, README v0; engineering, not results
+- Dropped the calendar milestones to finish the project in one push.
+- **C++/CUDA MPPI** (`mppi_cpp/`, D29):
+  - one `__host__ __device__` source for CPU and GPU; CUDA + CPU drivers; GoogleTest 22/22;
+  - ctypes binding on Warp device pointers;
+  - RNG bit-exact with Warp.
+- **Prediction → result.**
+  - Prediction: same samples, actions equal to ~1e-6.
+  - Result on 1,000 perturbed tuning states: samples bit-identical; first-step actions ≤ 1.3e-5; second step ≤ 5e-4.
+  - The difference is rounding (nvcc vs NVRTC FMA placement).
+  - Closed loop on 32 tuning scenarios: same outcomes, min clearance within 4.4 cm. Hence the one-backend rule (D29).
+- **Bugs:**
+  - CMake architecture default: sm_75 PTX that a 13.0 driver cannot JIT from a 13.3 toolkit. Fixed with
+    `120-real` before `project()`.
+  - A wrong expected value in my own softmin test.
+  - `.gitignore` `data/` hid the GoogleTest fixtures.
+- **Timing (shared GPU, indicative only; the clean table is from `bench_compute.py` later):**
+  - batched MPPI is faster on the C++ backend;
+  - one-car latency is about equal, dominated by the 3,000 sequential substeps per rollout;
+  - block reductions added for the weights/update steps.
+- **Evaluation pipeline:** `eval/runner.py` (main / H2 / dry sets), `eval/analysis.py` (H1–H3, Holm, secondary)
+  with synthetic-data tests, and `scripts/make_figures.py` (G4). **Prereg A5 + D30** fix the open evaluation details
+  before any test evaluation.
+- **Recovery latency (V4, exploratory, A5.9):** `eval/latency.py` + `--sets trace` (per-step e_y and r traces on
+  the H2 subset; latency against O-R's trace with a 0.5 s hold; censored if never held). Tests: 3 pass.
+- **Pipeline dry run** (tuning split, first 60 scenarios, 2 seeds, stand-in checkpoints: the pilot teacher for P-T
+  and P-S, the tuning M-L estimator): runner → `make_figures.py` produce every table and figure from the raw logs.
+  - Bug fixed: the H1 figure hid the −5 pp margin line (x-limits).
+  - Seen in passing (engineering, stand-in policies): the pilot teacher departs less than O-R on the
+    preview-required and undetermined scenarios, but it gives up about 34 m of progress. So it is slower, which
+    is what the H3 dry-pace condition is there to catch.
+- **README v0 + hero GIF:** M-N vs O-R on tuning scenario U2-00074 (curve entry onto ice), no numbers.
+  - Found with an M-N run on the 307 RF tuning scenarios: M-N departs on 32 and O-R succeeds on 27 of those.
+  - Engineering only.
+
 ### 2026-11-11: P3 resumed; engineering, not results
 - The GPU was free (another project idle). Started test-pool labelling, M-L and P-T tuning, and then P-TP once M-L
   finished.

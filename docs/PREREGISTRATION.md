@@ -214,3 +214,61 @@ tuning split only. Rationale: `DECISIONS.md` D19–D27 and the LOG entries of 20
   - Budget split: P-S = 14 teacher + 6 student trials (P-SP likewise); P-DR, M-B and M-L get 20 trials each. The
     V2 GPU-hour cap applies pro rata.
   - History windows: W ∈ {5, 12, 25, 50} control steps for every adaptive method.
+
+### A5 (2026-11-11): evaluation plan (D29, D30)
+Decided in-session. Adopted **before any method was evaluated on a test-split scenario**. It fixes what V6, V7
+and `EVAL_PROTOCOL.md` leave open. Code: `eval/runner.py`, `eval/analysis.py`, `scripts/eval_split.py`.
+- **A5.1 Implementation.** Every MPPI-based method (O-R, O-C, M-N, M-B, M-L) runs on the C++/CUDA MPPI in the
+  confirmatory runs (D29; S3 passed on 1,000 states). The labels stay as computed by the Warp oracles.
+- **A5.2 Gates first.** No test-split evaluation before S2 passes on the final P-T seeds (`scripts/s2_gate.py`) and
+  the test-pool labels pass S1 and the A4.6 probe.
+- **A5.3 Runs.**
+  - Every method runs on every labelled scenario of the main set (all classes; tables by class).
+  - MPPI methods (O-R, O-C, M-N, M-B): 5 noise seeds per scenario.
+  - Learned methods (P-T, P-TP, P-DR, P-S, P-SP): the 5 final training seeds, one episode per scenario each, with
+    observation-noise seed = training seed.
+  - M-L: estimator training seed s with MPPI noise seed s, s = 0…4.
+  - O-C runs on all scenarios here, unlike in labelling.
+  - M-N uses M-B's tuned MPPI settings (V2).
+- **A5.4 "The better of M-B/M-L"** is the one with the lower pooled departure rate on the reactive-feasible test
+  scenarios. Taking the minimum makes the H1 falsifier harder to meet, so the choice is conservative. The same
+  method is "the best adaptive MPPI" in H2 at every level.
+- **A5.5 H1 statistics.** d = departure(better MPPI) − departure(P-S), paired, hierarchical bootstrap (10,000;
+  seeds per method, then scenarios jointly).
+  - Falsified iff the 95% percentile CI lies entirely above +0.05.
+  - The p-value entering Holm is the bootstrap P(d ≤ 0.05).
+  - TOST at ±5 pp is reported alongside.
+  - The adaptation-required stratum (A4.5) gets the same numbers as a secondary analysis.
+- **A5.6 H2 sets.**
+  - Scenarios: 500 reactive-feasible test scenarios drawn without replacement with seed 2027 from the
+    reactive-feasible list in split-file order, the same for every axis and level. This bounds compute: 9
+    mismatch levels × 5 methods × 5 seeds.
+  - Level 0 is the main-set runs on those scenarios.
+  - Levels follow V6. The delay levels are +3/+5/+7 control steps, i.e. +60/100/140 ms on top of the nominal 20 ms.
+  - The handover drive uses the mismatched truth. O-R plans with the true (mismatched) model; every other method
+    keeps its nominal model.
+  - Methods: O-R, M-B, M-L, P-S, P-DR.
+  - Regret = departure − O-R's departure on the same scenarios. Δ(level) = regret(best adaptive MPPI) −
+    regret(P-S).
+  - (a) The least-squares slope of Δ over the centred level index 0…3 must be > 0, with its bootstrap 95% CI
+    excluding 0. (b) Δ at level 3 must be > 0, with its CI excluding 0.
+  - p_a and p_b are two-sided bootstrap p-values, set to 1 if the estimate points the other way. p_axis and p_H2
+    are as in V6.
+- **A5.7 H3.**
+  - Departure on the reactive-feasible main set.
+  - Dry progress on the **dry set**: the A5.6 scenarios with the drop removed (μ1 = μ0, dry surface), nominal truth.
+  - Falsified iff (i) the 95% CI of departure(P-S) − departure(P-SP) lies above 0, and (ii) the upper 95% CI bound
+    of P-SP's relative dry-progress loss vs P-S is < 2%.
+  - p_H3 = max(p of (i) as in A5.6, bootstrap P(loss ≥ 2%)).
+- **A5.8 Holm family.** {H1: P(d ≤ 0.05), H2: p_H2, H3: p_H3} at α = 0.05.
+- **A5.9 Secondary.**
+  - Regret vs O-R in max |e_y|, time out of lane, progress and loss of control, paired on reactive-feasible
+    scenarios.
+  - Dry pace tax = 1 − progress/progress(O-R) on the dry set.
+  - Recovery latency (V4) needs full traces and is computed in a separate pass labelled exploratory.
+  - All are reported with bootstrap 95% CIs and are outside the Holm family.
+- **A5.10 Top-ups and failures.**
+  - If the main pool has < 1,000 reactive-feasible scenarios, the V7 top-up blocks are labelled and added in order
+    before any evaluation.
+  - Diverged or failed training runs count as runs (EVAL_PROTOCOL §3).
+

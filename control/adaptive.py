@@ -29,7 +29,8 @@ import torch
 import warp as wp
 
 from control.controllers import MU_NOMINAL_DRY, run_seed
-from control.mppi import MPPI, MPPIConfig
+from control.mppi import MPPIConfig
+from control.mppi_cpp import make_mppi
 from rl.features import Features, share_stream
 from sim.observe import N_OBS, OBS_NAMES
 from sim.params import CONTROL_DT, N_SUBSTEPS, SURFACES, VehicleParams
@@ -119,7 +120,7 @@ class _AdaptiveBase:
                  model_params: VehicleParams = VehicleParams(), noise_scale: float = 1.0):
         self.sim, self.n = sim, sim.n
         share_stream(sim.device)
-        self.mppi = MPPI(sim, cfg, seed=np.array([run_seed(sc.sid, method, seed) for sc in scs]),
+        self.mppi = make_mppi(sim, cfg, seed=np.array([run_seed(sc.sid, method, seed) for sc in scs]),
                          model_params=model_params)
         self.mppi.reset(snap["buf"][:, 0, :])
         self.base_params = wp.clone(self.mppi.mparams)
