@@ -1,0 +1,19 @@
+{
+ "method": "M-L",
+ "best_params": {
+  "sigma_steer": 0.04816155468492294,
+  "sigma_long": 0.37971851830971115,
+  "lam": 82.03984513384539,
+  "rho": 0.0,
+  "W": 5,
+  "hidden": 64
+ },
+ "best_value": 0.07252899022801303,
+ "n_trials": 20,
+ "gpu_hours": 3.9583139048020044,
+ "stopped_by": "trials",
+ "tag": "M-L_1794422331",
+ "n_tuning_rf": 307,
+ "git": "49830f2ea71ca26c8099016666464b7aa4d059af",
+ "checkpoint": "runs/tuning/M-L_1794422331_estimator.pt"
+}

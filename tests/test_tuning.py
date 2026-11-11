@@ -36,3 +36,26 @@ def test_tuning_resumes_from_ledger(tmp_path):
     r2 = tune("m", obj, space, led, n_trials=5)
     assert r2.n_trials == 5 and len(calls) == 5  # only 2 new evaluations
     assert r2.best_value <= r1.best_value
+
+
+def test_resume_does_not_redraw_an_evaluated_config(tmp_path):
+    # regression (2026-11-11): a resumed study restarted the sampler RNG and re-ran the first configuration
+    space = lambda t: {"x": t.suggest_float("x", -1.0, 1.0)}
+    calls = []
+    obj = lambda p: (calls.append(p) or (p["x"] ** 2, 1.0))
+    led = tmp_path / "ledger.jsonl"
+    tune("m", obj, space, led, n_trials=1)
+    tune("m", obj, space, led, n_trials=4)
+    xs = [c["x"] for c in calls]
+    assert len(xs) == 4 and len(set(xs)) == 4
+
+
+def test_duplicate_config_costs_gpu_hours_but_not_a_trial(tmp_path):
+    led = tmp_path / "ledger.jsonl"
+    rec = {"method": "m", "trial": 0, "params": {"x": 0.5}, "value": 0.25, "gpu_s": 3600.0}
+    led.write_text(json.dumps(rec) + "\n" + json.dumps({**rec, "trial": 1}) + "\n")
+    calls = []
+    res = tune("m", lambda p: (calls.append(p) or (p["x"] ** 2, 3600.0)),
+               lambda t: {"x": t.suggest_float("x", -1.0, 1.0)}, led, n_trials=3, gpu_hours=10.0)
+    assert len(calls) == 2 and res.n_trials == 3  # 1 distinct replayed config + 2 new ones
+    assert abs(res.gpu_hours - 4.0) < 1e-9  # both replayed lines count toward the cap

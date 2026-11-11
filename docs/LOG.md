@@ -16,14 +16,26 @@ Format per entry: date, phase, hours, what was done, and the verdict for any run
   K-check (2 × 200 scenarios × 5 seeds) + 2 hard-case variant scans; ≈ 1.0 GPU-h of oracle runs (shared GPU). Logs in `runs/`.
 - Tunable methods (2026-11-08, paused; GPU-h = wall time on a GPU shared between jobs, which over-counts):
   - M-B: 20/20 trials, 2.81 GPU-h, done;
-  - M-L: 14/20, 3.06 GPU-h;
-  - P-T: 1/14, 1.26 GPU-h;
+  - M-L: 20 runs = 19 distinct configurations (one resume repeat, D28), 3.96 GPU-h, best 0.0725; one
+    replacement trial still to run;
+  - P-T: in progress (resumed 2026-11-11; trial 1 repeats trial 0, D28);
+  - P-TP: started 2026-11-11;
   - P-DR: 0/20.
   Line by line: `ledgers/tuning_ledger.jsonl`.
   PPO pilots before tuning (not counted in any method's budget, which is a design pilot like the oracle pilot):
   ≈ 1.5 GPU-h.
 
 ## Entries
+
+### 2026-11-11: P3 resumed; engineering, not results
+- The GPU was free (another project idle). Started test-pool labelling, M-L and P-T tuning, and then P-TP once M-L
+  finished.
+- **M-L tuning finished:** best failure rate 0.0725 on the 307 RF tuning scenarios (W = 5, hidden 64). M-B's best
+  is 0.039.
+- **Bug found and fixed (D28):** the resume restarted the sampler RNG, so one configuration was repeated in M-L and
+  one in P-T. A repeat now costs GPU-h but not a trial. Regression tests added; 151 tests pass.
+- A P-T trial with lr 6e-5 and init std 0.12/0.29 collapsed (failure 1.06, i.e. no successful episodes). The
+  objective can exceed 1 because it adds cost to the failure count. Logged as a normal trial.
 
 ### 2026-11-08 late: run paused (GPU needed for another project)
 - Every job was stopped cleanly at about 23:00.

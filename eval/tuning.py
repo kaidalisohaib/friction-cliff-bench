@@ -32,29 +32,36 @@ class TuneResult:
     stopped_by: str  # "trials" | "gpu_hours"
 
 
+def _key(params: dict) -> str:
+    return json.dumps(params, sort_keys=True)
+
+
 def tune(method: str, objective: Callable[[dict], tuple[float, float]], space: Callable[[optuna.Trial], dict],
          ledger: Path, n_trials: int = N_TRIALS, gpu_hours: float = GPU_HOURS, seed: int = 0,
          git: str = "unknown") -> TuneResult:
     """objective(params) -> (value to minimize, GPU-seconds used[, extra dict stored in the ledger line]).
     space(trial) -> params dict. Finished trials of `method` already in the ledger are replayed (resume)."""
     ledger.parent.mkdir(parents=True, exist_ok=True)
-    study = optuna.create_study(direction="minimize", sampler=optuna.samplers.TPESampler(seed=seed))
-    used = 0.0
-    done = 0
-    stopped_by = "trials"
+    prior = [json.loads(line) for line in ledger.read_text().splitlines()] if ledger.exists() else []
+    prior = [r for r in prior if r["method"] == method]
     # resume: replay this method's finished trials from the ledger into the study (same params, same values),
-    # so the TPE history and the trial/GPU-hour budget carry over after an interruption
-    if ledger.exists():
-        for line in ledger.read_text().splitlines():
-            rec = json.loads(line)
-            if rec["method"] != method:
-                continue
-            study.enqueue_trial(rec["params"])
-            trial = study.ask()
-            space(trial)
-            study.tell(trial, rec["value"])
-            used += rec["gpu_s"]
-            done += 1
+    # so the TPE history and the GPU-hour budget carry over after an interruption. The sampler seed is offset by
+    # the number of replayed trials: with the plain seed the sampler's RNG restarts and the first new trial
+    # re-draws a configuration that was already evaluated (found 2026-11-11, LOG).
+    study = optuna.create_study(direction="minimize",
+                                sampler=optuna.samplers.TPESampler(seed=seed + 7919 * len(prior)))
+    used = 0.0
+    seen: set[str] = set()
+    stopped_by = "trials"
+    for rec in prior:
+        study.enqueue_trial(rec["params"])
+        trial = study.ask()
+        space(trial)
+        study.tell(trial, rec["value"])
+        used += rec["gpu_s"]
+        seen.add(_key(rec["params"]))
+    # a repeated configuration costs GPU-hours but is not a new trial: the trial budget counts distinct configs
+    done = len(seen)
     while done < n_trials:
         if done > 0 and used + used / done > gpu_hours * 3600.0:
             stopped_by = "gpu_hours"
@@ -67,7 +74,9 @@ def tune(method: str, objective: Callable[[dict], tuple[float, float]], space: C
         extra = out[2] if len(out) > 2 else {}
         study.tell(trial, value)
         used += gpu_s
-        done += 1
+        if _key(params) not in seen:
+            seen.add(_key(params))
+            done += 1
         with open(ledger, "a") as f:
             f.write(json.dumps({"method": method, "trial": trial.number, "params": params, "value": value,
                                 "gpu_s": gpu_s, "wall_s": time.time() - t0, "git": git, **extra}) + "\n")

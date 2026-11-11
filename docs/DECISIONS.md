@@ -222,3 +222,15 @@ makes crashing early cheaper than surviving, so random exploration never learns 
   is learned by PPO.
 - Identical for every PPO variant, so it is not a fairness asymmetry; the MPPI side gets the same follower as its
   ancillary sample (D20/P2). Disclosed in the report.
+
+## D28: Tuning resume must not repeat a configuration; a repeat costs GPU-h but is not a trial. DECIDED 2026-11-11
+Found on the 2026-11-11 resume. Replaying the ledger restarted the TPE sampler's RNG, so the first new trial after
+each resume redrew an earlier configuration: M-L trial 14 repeats trial 10, and P-T trial 1 repeats trial 0 (the
+PPO run reproduced the same objective exactly, 0.0113, which is how it showed up).
+- Fix (`eval/tuning.py`): after replay, the sampler seed is offset by the number of replayed trials, so the
+  sequence is still deterministic but does not restart. Two regression tests.
+- Budget rule (prereg V2 says 20 trials = 20 evaluated configurations): a repeated configuration still counts its
+  GPU-seconds toward the GPU-hour cap, but not toward the trial count. M-L and P-T therefore each get one
+  replacement trial; their duplicate lines stay in the ledger.
+- Applies to every method equally (M-B never resumed, so it has 20 distinct configurations already).
+
