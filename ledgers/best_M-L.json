@@ -10,10 +10,10 @@
  },
  "best_value": 0.07252899022801303,
  "n_trials": 20,
- "gpu_hours": 3.9583139048020044,
+ "gpu_hours": 4.028537064724499,
  "stopped_by": "trials",
  "tag": "M-L_1794422331",
  "n_tuning_rf": 307,
- "git": "49830f2ea71ca26c8099016666464b7aa4d059af",
+ "git": "49d020c22e61791d517b5701181d7c8f915473ee",
  "checkpoint": "runs/tuning/M-L_1794422331_estimator.pt"
 }

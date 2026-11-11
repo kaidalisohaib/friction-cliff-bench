@@ -10,7 +10,9 @@ And in which scenarios can *nothing* save the car?
 friction model: the friction-blind planner keeps believing it can turn.*
 
 **Status (Nov 2026):** simulator, feasibility labelling, oracles, adaptive MPPI, RL arm and the C++/CUDA MPPI are
-built and tested; methods are being tuned on the tuning split. **No results yet.** The protocol was
+built and tested. The 4,000-scenario test pool is labelled and frozen
+([class breakdown](docs/figures/labels_test_T0.md)), and the methods are being tuned on the tuning split.
+**No controller results yet.** The protocol was
 [pre-registered](docs/PREREGISTRATION.md) (`prereg-v1`) before any test scenario was labelled or evaluated; later
 changes are dated amendments.
 
@@ -65,6 +67,11 @@ cmake -S mppi_cpp -B mppi_cpp/build -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nv
 cmake --build mppi_cpp/build -j && ./mppi_cpp/build/fcb_tests      # GoogleTest
 MPPI_BACKEND=cpp PYTHONPATH=. uv run pytest -q tests/test_mppi_cpp.py   # C++ vs Warp equivalence
 ```
+
+## Grounding against real cars
+The simulated car's steady-state understeer is compared with ten passenger-car platforms from openpilot driving logs
+([commaSteeringControl](https://huggingface.co/datasets/commaai/commaSteeringControl), MIT). The steering ratio is
+fitted, not assumed. Script, table and figure: [`docs/results/grounding/`](docs/results/grounding/comma_understeer.md).
 
 ## Limitations (by design)
 Simulation only, with a planar single-track (bicycle) model; one vehicle; friction drops along the lane only.

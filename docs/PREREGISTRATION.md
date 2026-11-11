@@ -272,3 +272,25 @@ and `EVAL_PROTOCOL.md` leave open. Code: `eval/runner.py`, `eval/analysis.py`, `
     before any evaluation.
   - Diverged or failed training runs count as runs (EVAL_PROTOCOL §3).
 
+
+### A6 (2026-11-11): H2 scenarios the shared driver cannot hand over (D31)
+Written after a pipeline dry run on the **tuning** split. No test scenario has been evaluated by any method.
+- **Problem.** A5.6 runs the handover drive (the shared dry driver, A4) on the mismatched truth. At +140 ms
+  delay, the driver itself failed to reach the handover state in 1 of 43 tuning-split H2 scenarios
+  (U-00032: R400 curve exit, 24.9 m/s). A5 did not say what happens to such a scenario.
+- **Rule.** For each mismatch axis, a scenario of the H2 subset is excluded if the shared driver fails to reach
+  handover under **any** level of that axis.
+  - It is excluded from every level of that axis, level 0 (the main-set runs) included, and for every method. So
+    Δ(level) and the slope stay paired on one scenario list per axis.
+  - Exclusion is decided from the handover drive alone, before any method runs on the set. It cannot depend on
+    any method's outcome.
+  - The excluded scenario ids and their number are reported per axis (`h2_excluded_<axis>.json`).
+- **Unchanged:** the H2 subset draw (500, seed 2027), the levels, the methods, the tests and the p-values of A5.6.
+
+**A6.2 Test labels frozen (G2).**
+- The test pool `splits/test_v1_T0.jsonl` was labelled with the frozen A4 oracle settings (config hash
+  7050c39f6a2a, 5 seeds). Result: 3,009 reactive-feasible, 755 preview-required, 29 certified-infeasible and
+  207 undetermined, with 363 adaptation-required. S1: 0 violations.
+- 3,009 ≥ 1,000 reactive-feasible, so no top-up block is labelled (A5.10).
+- The label file `labels/test_v1_T0.jsonl` is frozen by SHA-256 `7671fb0f…13d6` (`tests/test_frozen.py`).
+- No method has been run on any test scenario.

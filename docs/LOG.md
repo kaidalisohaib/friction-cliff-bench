@@ -27,6 +27,43 @@ Format per entry: date, phase, hours, what was done, and the verdict for any run
 
 ## Entries
 
+### 2026-11-11 night: G2 passed, prereg A6, P5 grounding, tech report skeleton; engineering, not results
+- **G2.** The test pool is labelled with the frozen A4 oracles (wall 3.95 h on a shared GPU).
+  - Classes: RF 3,009 / PR 755 / CI 29 / UD 207; adaptation-required 363. S1: 0 violations.
+  - No top-up needed (≥ 1,000 RF).
+  - Labels committed and hash-frozen (A6.2); figure `docs/figures/labels_test_T0.png`.
+  - The S1 probe (A4.6) is split-independent and passed on 11-08; it was not rerun.
+- **Prereg A6 / D31.** Found by the H2 dry run: at +140 ms delay the shared dry driver failed to hand over on 1 of
+  44 tuning H2 scenarios.
+  - Rule: exclude per axis, before any method runs, and report the excluded ids.
+  - Verified: `h2_excluded_delay.json` lists exactly U-00032.
+- **Mechanism logging.** The trace pass now records the planner's front-axle μ (M-B, M-L) and the true μ.
+  - The probe on 8 ice tuning scenarios found a broadcast bug in `recovery_latency` (unequal trace lengths across
+    methods). Fixed, with a regression test.
+- **CI.** The existing CPU job would have failed: three test modules import torch, which CI doesn't install. They
+  are now skipped there.
+  - New job: C++ CPU build + GoogleTest (`FCB_WITH_CUDA=OFF`; 20 tests).
+  - The whole CI configuration was simulated locally with torch blocked and no GPU: 149 passed.
+- **P5 grounding (comma).** Understeer gradient fitted on 10 passenger-car platforms from commaSteeringControl
+  (MIT), with the steering ratio fitted rather than taken from the specs.
+  - Prediction (D15): the simulator's ~2.0 deg/g lies inside the real range.
+  - Result: the simulator gives 2.01 deg/g. The real cars range from −0.31 to 2.81 (median 1.77) over 396k
+    samples. The simulator sits within the CI of 2 platforms, above 5 and below 3.
+  - Two MQB platforms (Octavia, A3) give implausible near-zero gradients with high fitted ratios. They are shown
+    but not interpreted.
+  - Output: `docs/results/grounding/`.
+- **H2 and trace dry runs** (tuning, stand-in checkpoints, engineering only):
+  - The H2 delay axis runs through the analysis and `fig_h2` with the A6 exclusion (43 scenarios per level).
+  - The mechanism figure works. What it shows, on 44 tuning runs:
+    - M-B's model drops to the new μ within ~0.2 s of the front axle reaching the drop.
+    - *Before* the drop, M-B chatters between bank models down to μ = 0.5 on dry road. Friction is weakly
+      observable far from the tire limit. Expected cost: a pace tax, since the planner is cautious on dry road.
+    - The tuning M-L estimator overestimates μ by ~0.2 for ~1.5 s after the drop.
+  - To check on the test traces later (exploratory, A5.9).
+- **M-L replacement trial (D28):** W = 12, objective 0.0888. The best is unchanged at 0.0725 (W = 5). M-L is complete: 20 distinct trials, 4.03 GPU-h.
+- **Tech report skeleton** (`paper/`, tectonic, 7 pp). Methods are written; results come from `paper/gen/*.tex`,
+  which the harness writes. Citations checked against the arXiv API (OptCar/Kalaria/Czechmanowski/Akki titles fixed).
+
 ### 2026-11-11 evening: P4 built (C++/CUDA MPPI, S3), evaluation pipeline + prereg A5, README v0; engineering, not results
 - Dropped the calendar milestones to finish the project in one push.
 - **C++/CUDA MPPI** (`mppi_cpp/`, D29):

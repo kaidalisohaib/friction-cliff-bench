@@ -55,3 +55,14 @@ def test_tuning_and_test_sets_share_no_instance():
     for name in FROZEN_SPLITS:
         if name.startswith("test"):
             assert not (tune & keys(name)), name
+
+
+# prereg amendment A6.2 (2026-11-11): the test-pool labels (labelled with the frozen A4 oracle settings), frozen
+# before any method is evaluated on the test split
+FROZEN_LABELS = {"test_v1_T0.jsonl": "7671fb0f95dc7f114c8c8cba3fc060bc0003a95735bbdd4cc0d8174973e013d6"}
+
+
+@pytest.mark.parametrize("name", sorted(FROZEN_LABELS))
+def test_committed_label_file_matches_recorded_hash(name):
+    p = SPLITS.parent / "labels" / name
+    assert hashlib.sha256(p.read_bytes()).hexdigest() == FROZEN_LABELS[name]

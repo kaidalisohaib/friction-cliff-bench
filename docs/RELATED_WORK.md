@@ -60,6 +60,14 @@ fast adaptive MPC at abrupt μ drops? **Feas.?** = does it label scenarios by ph
 - **Verdict:** no head-to-head found; no scoop. Do not switch to replicate-and-audit (PLAN §6).
 
 ## Scoop watch log (weekly arXiv alert; newest first)
+- **2026-11-11:** The P0 arXiv queries were rerun (sorted by date) plus (vehicle ∨ racing ∨ car) ∧ friction ∧ adapt*.
+  None of the new papers is a head-to-head of an RMA-class policy against adaptive MPC at abrupt drops, and none
+  labels feasibility.
+  - LLA-MPC on embedded hardware (2610.03616, Liao/AL-Sunni/Dolan): F1TENTH, model-side only. Cited.
+  - Context-conditioned HJ reachability (2610.08115, Bansal lab): a learned friction-conditioned safety value
+    function. Related to our feasibility layer and to the safety-filter extension. Cited.
+  - Indirect-adaptive robust control under unknown friction (2610.22675): model-based only.
+  - Verdict: no scoop.
 - **2026-10-14:** LLA-MPPI (2610.10465, 7 Oct 2026): legged, DR-PPO baseline; not a scoop, but the LLA group is the
   most likely to publish a vehicle MPPI-vs-RL comparison. Poznań group remains the other top risk. UNLV REU RMA
   racing repo (Summer 2026): RMA on cars without MPC baselines.

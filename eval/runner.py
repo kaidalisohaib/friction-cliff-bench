@@ -92,6 +92,27 @@ def scenario_set(set_name: str, split_files, label_files, limit: int = 0) -> lis
     return sub
 
 
+def axis_exclusions(axis: str, sub: list, tracks, device, out_root: Path) -> list[str]:
+    """Prereg A6: H2-subset scenarios in which the shared dry driver cannot reach the handover state under some
+    level of this mismatch axis (the driver itself is destabilised, e.g. by +140 ms delay). They are dropped from
+    every level of the axis, level 0 included, for every method, and their number is reported. Decided from the
+    prefix drive only, before any method runs (cached in <out>/h2_excluded_<axis>.json)."""
+    from control.episode import run_prefix
+    f = out_root / f"h2_excluded_{axis}.json"
+    if f.exists():
+        d = json.loads(f.read_text())
+        if d["subset"] == [sc.sid for sc in sub]:
+            return d["sids"]
+    bad = set()
+    for lv in H2_LEVELS[axis]:
+        _, info = run_prefix(sub, tracks, truth_params(f"h2-{axis}-{lv}"), device, strict=False)
+        bad |= {sc.sid for sc, ok in zip(sub, info["done"]) if not ok}
+    out_root.mkdir(parents=True, exist_ok=True)
+    f.write_text(json.dumps({"axis": axis, "rule": "prereg A6", "subset": [sc.sid for sc in sub],
+                             "sids": sorted(bad)}, indent=1))
+    return sorted(bad)
+
+
 def best(m: str) -> dict:
     return json.loads((TUNE / f"best_{m}.json").read_text())
 
@@ -157,9 +178,13 @@ def run_set(set_name: str, methods: list[str], seeds: list[int], split_files, la
     out = out_root / set_name
     out.mkdir(parents=True, exist_ok=True)
     tracks = T.all_tracks()
+    excluded = []
+    if set_name.startswith("h2-"):
+        excluded = axis_exclusions(set_name.split("-")[1], scs, tracks, device, out_root)
+        scs = [sc for sc in scs if sc.sid not in set(excluded)]
     snap = handover(scs, tracks, truth, device, cache=out / "handover.npz")
     meta = {"set": set_name, "n": len(scs), "truth": asdict(truth), "git": git_sha(),
-            "mppi_backend": "cpp" if use_cpp() else "warp"}
+            "mppi_backend": "cpp" if use_cpp() else "warp", "excluded_A6": excluded}
     (out / "meta.json").write_text(json.dumps(meta, indent=1))
     for m in methods:
         for seed in seeds:

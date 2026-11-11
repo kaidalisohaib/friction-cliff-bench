@@ -58,13 +58,15 @@ def main():
         ve = lab["v_eff"]
         band = "≤12" if ve <= 12 else "12–17" if ve <= 17 else "17–22" if ve <= 22 else ">22"
         fam = "straight" if s.R == 0 else f"R{int(s.R)}"
-        k2 = f"{fam} {band}"
+        k2 = f"{fam}\n{band}"
         g1.setdefault(k1, Counter())[lab["label"]] += 1
         g2.setdefault(k2, Counter())[lab["label"]] += 1
-    g1 = dict(sorted(g1.items(), key=lambda kv: (["wet", "snow", "ice"].index(kv[0].split()[0]), kv[0])))
+    plen = lambda x: float("inf") if x == "∞" else float(x)
+    g1 = dict(sorted(g1.items(), key=lambda kv: (["wet", "snow", "ice"].index(kv[0].split()[0]),
+                                                  plen(kv[0].split()[1]))))
     order = ["straight", "R50", "R100", "R200", "R400"]
     bands = ["≤12", "12–17", "17–22", ">22"]
-    g2 = {k: g2[k] for k in sorted(g2, key=lambda k: (order.index(k.split()[0]), bands.index(k.split()[1])))}
+    g2 = {k: g2[k] for k in sorted(g2, key=lambda k: (order.index(k.split("\n")[0]), bands.index(k.split("\n")[1])))}
     fig, axs = plt.subplots(2, 1, figsize=(13, 8))
     bars(axs[0], g1, "by post-drop surface and patch length")
     bars(axs[1], g2, "by geometry and effective speed v_eff [m/s]")

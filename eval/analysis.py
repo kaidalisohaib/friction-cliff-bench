@@ -227,7 +227,8 @@ def analyze(root: Path, labels: dict, methods, h2_names: list[str] | None = None
             lv = [load_set(root, n, h2m) for n in names]
             if not all("O-R" in L and best in L and "P-S" in L for L in lv):
                 continue
-            sub_sids = lv[0]["O-R"]["sids"]
+            sub_sids = lv[0]["O-R"]["sids"]  # the H2 subset minus the axis' A6 exclusions
+            assert all(L[m]["sids"] == sub_sids for L in lv for m in L), f"H2 {axis}: levels differ in scenarios"
             pos = {s: j for j, s in enumerate(sids)}
             cols = [pos[s] for s in sub_sids]
             lv0 = {m: {"sids": sub_sids, "recs": [[rr[c] for c in cols] for rr in main[m]["recs"]]}

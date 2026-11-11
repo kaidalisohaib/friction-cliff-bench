@@ -17,7 +17,7 @@ from control.mppi_cpp import use_cpp
 from eval import runner as R
 
 SPLITS = {
-    "test": (["splits/test_v1_T0.jsonl"], ["runs/label_test_T0/labels.jsonl"]),
+    "test": (["splits/test_v1_T0.jsonl"], ["labels/test_v1_T0.jsonl"]),
     "tuning": (["splits/tuning_v1.jsonl", "splits/tuning_v1_b2.jsonl"],
                ["labels/tuning_v1.jsonl", "labels/tuning_v1_b2.jsonl"]),
 }
@@ -45,8 +45,9 @@ def main():
     if a.labels:
         labels = a.labels.split(",")
     if a.split == "test":
-        if "### A5" not in Path("docs/PREREGISTRATION.md").read_text():
-            raise SystemExit("test-split evaluation needs prereg amendment A5 (evaluation plan) first")
+        prereg = Path("docs/PREREGISTRATION.md").read_text()
+        if "### A5" not in prereg or "### A6" not in prereg:
+            raise SystemExit("test-split evaluation needs prereg amendments A5 (evaluation plan) and A6 first")
         if not use_cpp():
             raise SystemExit("confirmatory runs use the C++ MPPI backend (D29): set MPPI_BACKEND=cpp")
         if a.final_dir or a.limit:

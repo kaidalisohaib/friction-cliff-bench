@@ -143,8 +143,11 @@ def prefix_action_loop(fr, X, scs, tracks, profiles, p: VehicleParams):
     return acts
 
 
-def run_prefix(scs, tracks, p: VehicleParams = VehicleParams(), device="cpu", a_lat_frac: float = A_LAT_FRAC):
-    """Drive every scenario to its handover state. Returns (snapshot dict with one row per scenario, info)."""
+def run_prefix(scs, tracks, p: VehicleParams = VehicleParams(), device="cpu", a_lat_frac: float = A_LAT_FRAC,
+               strict: bool = True):
+    """Drive every scenario to its handover state. Returns (snapshot dict with one row per scenario, info).
+    strict=False: no error if the driver fails to reach handover; info["done"] marks the rows that did (the others
+    are zero), for the H2 exclusion rule (prereg A6)."""
     sim = ScenarioSim(scs, p, tracks, device)
     sim.reset_at_start()
     profiles = [speed_profile(tracks[sc.track_id], sc.v0, sc.mu0, a_lat_frac) for sc in scs]
@@ -169,9 +172,11 @@ def run_prefix(scs, tracks, p: VehicleParams = VehicleParams(), device="cpu", a_
             done |= ready
         if done.all():
             break
-    if not done.all():
+    if strict and not done.all():
         raise RuntimeError(f"prefix did not reach handover for {np.count_nonzero(~done)} scenarios")
-    return snap, {"t_prefix": t_prefix}
+    if snap is None:
+        snap = {kk: np.zeros_like(vv) for kk, vv in sim.snapshot().items()}
+    return snap, {"t_prefix": t_prefix, "done": done}
 
 
 @dataclass

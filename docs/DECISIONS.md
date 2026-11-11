@@ -279,3 +279,21 @@ What A5 adds to V6/V7/EVAL_PROTOCOL and why:
 - **Recovery latency** is moved to an exploratory pass. It needs per-step traces of every run, and it is not in
   the Holm family.
 
+
+## D31: H2 scenarios the shared driver cannot hand over are excluded per axis (prereg A6). DECIDED 2026-11-11
+- **Found by:** the evaluation dry run on the tuning split (first 60 scenarios, stand-in checkpoints). At +140 ms
+  delay, `run_prefix` did not reach handover for one scenario (U-00032, R400 exit, 24.9 m/s). The PD + feedforward
+  driver was never designed for 160 ms of total delay at that speed.
+- **Options considered:**
+  1. **Drop the scenario from that level only.** Rejected: the levels would no longer share one scenario list, and
+     the paired slope bootstrap (A5.6) needs one.
+  2. **Count it as a failure for every method.** Rejected: it adds zeros to every regret difference and hides the
+     fact that the scenario never reached the methods.
+  3. **Hand over on the nominal truth, then switch the plant.** Rejected: it changes A5.6 ("the handover drive
+     uses the mismatched truth"). It also needs the delay buffer resized mid-run, which is a new code path whose
+     only purpose would be this case.
+  4. **Exclude per axis (chosen).** Paired, decided before any method runs, reported. Expected to be rare (1/43
+     at the worst delay level on tuning data).
+- **Implementation:** `control/episode.py: run_prefix(strict=False)`, `eval/runner.py: axis_exclusions`. The analysis
+  asserts that every level of an axis has the same scenario list. `scripts/eval_split.py` requires A6 in the
+  prereg before a test evaluation.
