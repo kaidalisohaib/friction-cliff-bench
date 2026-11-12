@@ -14,18 +14,40 @@ Format per entry: date, phase, hours, what was done, and the verdict for any run
 ## Tuning ledger (per method: trials, GPU-h, human-h)
 - Oracles (not a tuned method; settings pilot on the tuning split, FEASIBILITY §3): 24 grid configs on 40 scenarios +
   K-check (2 × 200 scenarios × 5 seeds) + 2 hard-case variant scans; ≈ 1.0 GPU-h of oracle runs (shared GPU). Logs in `runs/`.
-- Tunable methods (2026-11-08, paused; GPU-h = wall time on a GPU shared between jobs, which over-counts):
-  - M-B: 20/20 trials, 2.81 GPU-h, done;
-  - M-L: 20 runs = 19 distinct configurations (one resume repeat, D28), 3.96 GPU-h, best 0.0725; one
-    replacement trial still to run;
-  - P-T: in progress (resumed 2026-11-11; trial 1 repeats trial 0, D28);
-  - P-TP: started 2026-11-11;
-  - P-DR: 0/20.
+- Tunable methods (final, 2026-11-11; GPU-h = wall time on a GPU often shared between jobs, which over-counts;
+  failure-rate objective on the 307 RF tuning scenarios, lower is better):
+
+  | method | trials | GPU-h | best objective |
+  |---|---|---|---|
+  | M-B | 20 | 2.81 | 0.039 |
+  | M-L | 20 (+ 1 resume repeat, D28) | 4.03 | 0.073 |
+  | P-T (teacher; inside the P-S budget) | 14 | 6.26 | 0.011 |
+  | P-S (student) | 6 | 0.14 | 0.000 |
+  | P-TP (teacher, preview) | 14 | 3.39 | 0.007 |
+  | P-SP (student, preview) | 6 | 0.12 | 0.003 |
+  | P-DR | 20 | 2.62 | 0.013 |
+
+  The best values are tuning-split numbers used for selection only, not results.
   Line by line: `ledgers/tuning_ledger.jsonl`.
   PPO pilots before tuning (not counted in any method's budget, which is a design pilot like the oracle pilot):
   ≈ 1.5 GPU-h.
 
 ## Entries
+
+### 2026-11-12 night: confirmatory test evaluation launched; D34; compute benchmark; engineering
+- **Compute benchmark** (`docs/results/compute_benchmarks.*`, N = 30, idle GPU) committed after a label fix. The
+  simulator table printed the repetition count instead of the number of cars; the rates themselves were right.
+  `scripts/compute_tex.py` → `paper/gen/compute.tex`.
+- **Batch-invariance check before the test run.** Prediction: records independent of batch size. Result: true for
+  pure MPPI (O-R), false for M-B and P-S. The observation-noise generator is seeded per batch. Same law, different
+  realisation. Every method is deterministic at a fixed batch. → D34: test evaluation at batch 64 (the tuning
+  batch).
+- **Test evaluation launched** 2026-11-11 21:05 (`runs/eval_test/`: main, dry, h2 as three parallel jobs,
+  C++ backend). Three jobs give about 3× the throughput of one: each job syncs to the host every control step, so
+  one job alone leaves the GPU idle part of the time.
+- **Incident:** at about 01:00 on 11-12 the session restart killed all three jobs (nohup was not enough; they shared
+  the session's process group). About 1 h of in-progress (method, seed) pairs was lost; completed files are kept by
+  design. Relaunched at 01:46 with `setsid`.
 
 ### 2026-11-12 early: S2 rerun after A8: still fails; proceeding per A8 with the caveat; engineering
 - **Retrained P-T with collapse rollback** (7 rollbacks over 5 seeds). S2: P-T 0.197 (N = 1,535, Wilson
