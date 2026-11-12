@@ -271,6 +271,9 @@ def analyze(root: Path, labels: dict, methods, h2_names: list[str] | None = None
         res["holm"] = {"p": pv, "rejected": St.holm(pv)}
     res["hypotheses"] = hyp
     res["secondary_rf"] = secondary(main, rf_cols, dry, methods)
+    # per-seed reactive-feasible departure (all seeds reported, never best-of; A8: S2 failed on seed instability)
+    res["per_seed_rf_departure"] = {m: [float(x) for x in np.nanmean(mat(main, m, "departed", rf_cols), axis=1)]
+                                    for m in methods if m in main}
     if v_eff is not None:  # exploratory E6 (A7)
         ve = np.array([v_eff[sids[j]] for j in rf_cols])
         res["exploratory_caution_rf"] = caution(main, rf_cols, ve, methods)
@@ -340,6 +343,10 @@ def markdown(res: dict, title: str) -> str:
                 return f"{r[k]['estimate']:+.{nd}f} [{r[k]['ci95'][0]:+.{nd}f}, {r[k]['ci95'][1]:+.{nd}f}]"
             L.append(f"| {m} | {f('regret_max_abs_ey')} | {f('regret_time_out_of_lane')} | {f('regret_progress', 1)} | "
                      f"{f('dry_pace_tax', 4)} |")
+    if res.get("per_seed_rf_departure"):
+        L += ["", "## Per-seed departure (reactive-feasible; seed 0..4)", "", "| method | per seed |", "|---|---|"]
+        for m, v in res["per_seed_rf_departure"].items():
+            L.append(f"| {m} | {', '.join(f'{x:.3f}' for x in v)} |")
     if res.get("exploratory_caution_rf"):
         L += ["", "## Exploratory E6 (A7): arrival speed at the drop (reactive-feasible)", "",
               "| method | arrival / v_eff [95% CI] | departure by arrival bin <0.8 / 0.8–0.9 / 0.9–1.0 / ≥1.0 (k/n) |",

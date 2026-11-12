@@ -27,6 +27,24 @@ Format per entry: date, phase, hours, what was done, and the verdict for any run
 
 ## Entries
 
+### 2026-11-12 early: S2 rerun after A8: still fails; proceeding per A8 with the caveat; engineering
+- **Retrained P-T with collapse rollback** (7 rollbacks over 5 seeds). S2: P-T 0.197 (N = 1,535, Wilson
+  [0.178, 0.218]) vs O-R 0.037 + 5 pp. **Fail.**
+  - Per seed: 0.010 / 0.016 / 0.176 / 0.039 / 0.746.
+  - The rollback fixed seed 1 (0.182 → 0.016). Seed 2 collapsed this time (the per-seed runs are not
+    bit-identical once a rollback happens).
+- **Seed 4 again kept its iteration-60 checkpoint** (training success 0.69, stochastic actions). With
+  deterministic actions it drives slowly and off-centre, grazing the edge: median min clearance −0.19 m, departure
+  0.746.
+  - Not a pipeline bug: training and evaluation use the same success definition, and the other seeds evaluate
+    well through the same code.
+  - Causes: PPO seed instability, plus checkpoint selection on noisy stochastic training episodes.
+- **Decision (pre-committed in A8):** no further fix. H1–H3 run on all seeds and are reported with "P-T failed S2
+  (seed instability: 2/5 seeds)". Per-seed RF departure is added to the analysis output.
+  - A validation-based checkpoint selector would be the obvious next fix. It is noted as future work, not done
+    after seeing S2 twice (forking paths).
+- S2 JSONs: `ledgers/s2_gate_v1.json` (pre-A8), `ledgers/s2_gate_A8.json`.
+
 ### 2026-11-11 late night: tuning complete except P-DR; A7 (caution); S2 failed → A8 rollback; engineering, not results
 - **Tuning** (best objective on the 307 RF tuning scenarios; ledger in `ledgers/`):
   - P-T 0.0113 (14 trials, 6.26 GPU-h);

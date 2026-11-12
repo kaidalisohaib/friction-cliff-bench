@@ -11,6 +11,7 @@ needs (main and dry: all; H2: O-R, M-B, M-L, P-S, P-DR, the methods in the H2 te
 """
 
 import argparse
+import json
 from pathlib import Path
 
 from control.mppi_cpp import use_cpp
@@ -46,8 +47,13 @@ def main():
         labels = a.labels.split(",")
     if a.split == "test":
         prereg = Path("docs/PREREGISTRATION.md").read_text()
-        if not all(f"### A{i}" in prereg for i in (5, 6, 7)):
-            raise SystemExit("test-split evaluation needs prereg amendments A5-A7 first")
+        if not all(f"### A{i}" in prereg for i in (5, 6, 7, 8)):
+            raise SystemExit("test-split evaluation needs prereg amendments A5-A8 first")
+        s2 = Path("runs/final/s2_gate.json")
+        if not s2.exists():
+            raise SystemExit("run scripts/s2_gate.py on the final P-T seeds first (A5.2)")
+        if not json.loads(s2.read_text())["S2"]["pass"]:
+            print("NOTE: S2 failed on the final P-T seeds; proceeding under prereg A8 (reported with that caveat)")
         if not use_cpp():
             raise SystemExit("confirmatory runs use the C++ MPPI backend (D29): set MPPI_BACKEND=cpp")
         if a.final_dir or a.limit:
