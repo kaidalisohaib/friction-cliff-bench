@@ -333,3 +333,18 @@ What A5 adds to V6/V7/EVAL_PROTOCOL and why:
 - **Fairness note.** This adds engineering effort to the learned arm after seeing tuning data. The MPPI arm also
   had bugs fixed after tuning-data runs (e.g. D28). Human-hours are logged, not capped (V2). The trial and
   GPU-hour budgets are unchanged.
+
+## D34: The test evaluation runs at batch = 64, the tuning batch size (engineering, no amendment). DECIDED 2026-11-11
+- **Finding:** before launching the test evaluation, a check on 16 tuning scenarios compared batch 4 against
+  batch 16.
+  - O-R (pure MPPI) records are identical: the MPPI noise is seeded per car (`run_seed`).
+  - M-B and P-S records differ. The observation-noise generator in `rl/features.py` is seeded once per batch,
+    so a car's noise realisation depends on which cars share its batch.
+  - Repeating any method at the same batch size reproduces it bit for bit.
+- **Why this is not a validity problem:** the noise is i.i.d. per car with the same distribution in any batch.
+  No method sees a different noise *law*; only the realisation changes, like a different seed.
+- **Decision:** keep the code. Run the test evaluation at the default batch = 64, the batch size tuning used
+  (`tune_method.py`). Results are then reproducible from the commit, the checkpoints and that batch size.
+  - Making the noise per car would change the noise realisations relative to tuning. It would also mean editing
+    controller code just before the test run, for no gain in validity.
+- **Write-up:** the reproducibility statement names the batch size.

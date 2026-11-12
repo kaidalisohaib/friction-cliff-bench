@@ -111,7 +111,7 @@ def main():
         ts = time_calls(lambda: [sim.step(acts) for _ in range(10)], a.reps, dev) / 10
         s = summarize(ts)
         rate = n / np.array([s["median"], s["hi"], s["lo"]])
-        res["sim"].append({"n": n, **s, "ctrl_steps_per_s": {"median": rate[0], "lo": rate[1], "hi": rate[2]}})
+        res["sim"].append({**s, "cars": n, "ctrl_steps_per_s": {"median": rate[0], "lo": rate[1], "hi": rate[2]}})
         print(f"sim n={n}: {rate[0]:.3e} control steps/s [{rate[1]:.3e}, {rate[2]:.3e}]", flush=True)
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "compute_benchmarks.json").write_text(json.dumps(res, indent=1))
@@ -138,7 +138,7 @@ def main():
     L += ["", "## Simulator (Warp), fixed surfaces", "", "| cars | control steps/s |", "|---|---|"]
     for r in res["sim"]:
         q = r["ctrl_steps_per_s"]
-        L.append(f"| {r['n']} | {q['median']:.3e} [{q['lo']:.3e}, {q['hi']:.3e}] |")
+        L.append(f"| {r['cars']} | {q['median']:.3e} [{q['lo']:.3e}, {q['hi']:.3e}] |")
     (OUT / "compute_benchmarks.md").write_text("\n".join(L) + "\n")
     print("\n".join(L))
 

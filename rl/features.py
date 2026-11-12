@@ -71,6 +71,9 @@ class Features:
         self.lf = p.lf
         self.scale = torch.tensor(OBS_SCALE, device=self.dev)
         self.hist = torch.zeros(self.n, self.W, N_FEAT, device=self.dev)
+        # One generator per batch (seeded from the cars' run seeds): the noise is i.i.d. per car, but its realisation
+        # depends on the batch partition. Runs are deterministic at a fixed batch size; tuning and the test
+        # evaluation both use batch = 64 (D34). MPPI sampling noise is per car and batch-invariant.
         self.gen = torch.Generator(device=self.dev)
         self.gen.manual_seed(int(np.asarray(seeds).sum()) % (2 ** 31))
         self.prof = torch.zeros(self.n, 8, device=self.dev)
