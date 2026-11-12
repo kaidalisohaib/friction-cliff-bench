@@ -103,3 +103,64 @@ def test_caution_bins_split_departures_by_arrival_speed():
     assert out["A"]["bins"][0]["n_runs"] == 120 and out["A"]["bins"][0]["departed"] == 0
     b = out["B"]["bins"][3]  # ratio 1.0 falls in [1.0, inf)
     assert b["n_runs"] == 120 and b["departed"] == 60
+
+
+def test_e7_caution_rule(tmp_path):
+    # P-S departs 2%, M-B (better MPPI) 20%: a student advantage in H1. M-B-c either matches P-S (caution) or
+    # stays at 20% (the slower speed does not help: the advantage is not attributed to caution).
+    labels = _labels()
+    for case, p_mbc, caution in (("slow-helps", 0.02, True), ("slow-no-help", 0.20, False)):
+        root = tmp_path / case
+        rng = np.random.default_rng(1)
+        for m, p in (("O-R", 0.02), ("M-B", 0.20), ("M-L", 0.30), ("P-S", 0.02), ("M-B-c", p_mbc)):
+            _write(root, "main", m, p, rng=rng)
+        res = A.analyze(root, labels, ["O-R", "M-B", "M-L", "P-S", "M-B-c"])
+        e = res["exploratory_e7"]
+        assert e["student_advantage_in_H1"]
+        assert e["attributed_to_caution"] is caution, (case, e)
+    # no student advantage -> nothing to attribute, whatever M-B-c does
+    root = tmp_path / "no-adv"
+    rng = np.random.default_rng(2)
+    for m, p in (("O-R", 0.02), ("M-B", 0.02), ("M-L", 0.30), ("P-S", 0.20), ("M-B-c", 0.02)):
+        _write(root, "main", m, p, rng=rng)
+    e = A.analyze(root, labels, ["O-R", "M-B", "M-L", "P-S", "M-B-c"])["exploratory_e7"]
+    assert not e["student_advantage_in_H1"] and not e["attributed_to_caution"]
+
+
+def test_e7_dry_pace_tax_difference(tmp_path):
+    labels = _labels(100)
+    rng = np.random.default_rng(3)
+    for m in ("O-R", "M-B", "P-S", "M-B-c"):
+        _write(tmp_path, "main", m, 0.05, n=100, rng=rng)
+    for m, prog in (("O-R", 100.0), ("M-B", 100.0), ("P-S", 90.0), ("M-B-c", 80.0)):
+        _write(tmp_path, "dry", m, 0.0, n=100, progress=prog, rng=rng)
+    e = A.analyze(tmp_path, labels, ["O-R", "M-B", "P-S", "M-B-c"])["exploratory_e7"]
+    t = e["dry_pace_tax_diff_MBc_minus_PS"]  # tax 0.2 - 0.1 = +0.1 (up to the 1% progress jitter)
+    assert abs(t["estimate"] - 0.1) < 0.01 and t["ci95"][0] > 0.08
+
+
+def test_recovery_summary(tmp_path):
+    # O-R holds e = 0; method "M-B" leaves the band for 1 s after the drop then returns; "M-L" never returns.
+    from sim.params import CONTROL_DT
+    tr = tmp_path / "trace"
+    tr.mkdir()
+    n, T = 30, 400
+    sid = np.array([f"s{j}" for j in range(n)])
+    t_drop = np.full(n, 1.0)
+    k0 = int(round(1.0 / CONTROL_DT)) - 1
+    zero = np.zeros((n, T))
+    late = zero.copy()
+    late[:, k0:k0 + int(1.0 / CONTROL_DT)] = 1.0
+    never = zero.copy()
+    never[:, k0:] = 1.0
+    for s in range(2):
+        for m, e in (("O-R", zero), ("M-B", late), ("M-L", never)):
+            np.savez(tr / f"{m}_s{s}.npz", sid=sid, e=e, r=zero, t_drop=t_drop)
+    v_eff = {f"s{j}": 10.0 + j for j in range(n)}
+    out = A.recovery(tmp_path, ["O-R", "M-B", "M-L"], v_eff, seeds=(0, 1), n_boot=200)
+    assert out["M-B"]["recovered_frac"]["estimate"] == 1.0
+    assert abs(out["M-B"]["median_latency_recovered_s"]["estimate"] - 1.0) < 1e-6
+    assert out["M-L"]["recovered_frac"]["estimate"] == 0.0
+    assert out["M-L"]["median_latency_recovered_s"] is None
+    assert "M-L" in A.markdown({"classes": {}, "exploratory_recovery": out}, "t")
+    assert out["M-B"]["n_runs"] == 2 * n

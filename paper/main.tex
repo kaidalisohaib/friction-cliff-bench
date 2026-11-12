@@ -158,6 +158,7 @@ P-T & PPO teacher & privileged current $\mu$ & policy upper bound\\
 \textbf{P-S} & \textbf{RMA student} & latent regressed from history & \textbf{method under test}\\
 P-DR & domain-randomised PPO & none & robustness baseline\\
 P-SP & student of a 30\,m-preview teacher & none (teacher had preview) & H3 ablation\\
+M-B-c & M-B at the student's arrival speed & as M-B & exploratory (A7)\\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -176,10 +177,21 @@ formulation, tire relaxation length, extra actuator delay up to +140\,ms; all ou
 adaptive-MPPI regret against O-R grows faster than the student's. \textbf{H3} (RQ3): the current-friction student
 matches or beats the preview-teacher student on departure without a dry-pace cost of 2\% or more.
 Statistics: hierarchical bootstrap over scenarios and seeds, TOST at $\pm5$\,pp, Holm--Bonferroni over H1--H3.
-The protocol was tagged \texttt{prereg-v1} before any test scenario was labelled; six dated amendments (A1--A6)
-record later decisions, each before the data it concerns. Amendment A6, for instance, was triggered by a pipeline
-dry run on tuning data: at +140\,ms delay the shared driver itself can fail to reach the handover state, and such
-scenarios are excluded from every level of that axis for every method.
+The protocol was tagged \texttt{prereg-v1} before any test scenario was labelled; eight dated amendments (A1--A8)
+record later decisions, each before the data it concerns. Three of them shape how the results read.
+\textbf{A6} was triggered by a pipeline dry run on tuning data: at +140\,ms delay the shared driver itself can fail
+to reach the handover state, and such scenarios are excluded from every level of that axis for every method.
+\textbf{A7} followed an observation on tuning data: the trained policies reach the friction drop at about two
+thirds of the reference speed, while the MPPIs arrive near it. Slowing down early lowers departure whether or not a
+controller adapts, so A7 adds two exploratory analyses outside the Holm family. E6 bins departure by arrival speed.
+E7 runs a bank MPPI at the student's arrival speed (M-B-c, with the speed factor frozen from tuning data) and fixes
+the reading in advance: if M-B-c departs no more than the student, the student's advantage is attributed to caution.
+\textbf{A8} handled a failed sanity gate. The PPO teacher must depart no more than O-R + 5\,pp on the tuning
+scenarios (S2). It failed because two of five training seeds collapsed, so A8 added a collapse rollback to every
+PPO run and stated beforehand that, should S2 still fail, the results are reported with that caveat and per seed.
+\textbf{Reproducibility.} Each run's MPPI noise is seeded per scenario, method and seed. The observation noise is
+drawn per batch of 64 cars, the batch size used for tuning and testing, so every run is reproducible from the
+commit, the checkpoints and that batch size.
 
 \section{Implementation}\label{sec:impl}
 The simulator, reference MPPI, RL environment and PPO run on one GPU (RTX 5090 Laptop) through zero-copy

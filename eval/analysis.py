@@ -228,6 +228,87 @@ def caution(main: dict, cols, v_eff: np.ndarray, methods) -> dict:
     return out
 
 
+def e7(main: dict, cols, dry: dict, h1_res: dict | None = None) -> dict:
+    """Exploratory E7 (prereg A7): speed-matched bank MPPI (M-B-c) against the student P-S, paired.
+
+    - departure difference M-B-c - P-S on the given (reactive-feasible) scenarios, hierarchical bootstrap;
+    - dry pace tax difference (tax(M-B-c) - tax(P-S), both against O-R on the dry set), joint bootstrap.
+    Interpretation fixed by A7: if M-B-c's departure is not higher than P-S's (95% CI of the difference includes 0
+    or favours M-B-c), the student's H1 advantage is attributed to caution, not adaptation. The rule only has
+    something to explain if the student departs less than the better adaptive MPPI (point estimate of H1 > 0)."""
+    a, b = mat(main, "M-B-c", "departed", cols), mat(main, "P-S", "departed", cols)
+    d = St.hier_bootstrap_diff(a, b, N_BOOT, np.random.default_rng(8))
+    point = float(np.nanmean(a) - np.nanmean(b))
+    lo, hi = St.ci(d)
+    out = {"n_scenarios": len(cols), "dep_MBc": float(np.nanmean(a)), "dep_PS": float(np.nanmean(b)),
+           "diff_MBc_minus_PS": summary(d, point), "mbc_not_higher": bool(lo <= 0)}
+    adv = h1_res is not None and h1_res["diff_best_minus_PS"]["estimate"] > 0
+    out["student_advantage_in_H1"] = bool(adv)
+    out["attributed_to_caution"] = bool(adv and lo <= 0)
+    if dry and all(m in dry for m in ("M-B-c", "P-S", "O-R")):
+        pm, ps, po = (mat(dry, m, "progress") for m in ("M-B-c", "P-S", "O-R"))
+        bm = boot_means({"m": pm, "s": ps, "o": po}, n_boot=2000, seed=9)
+        dt = (1.0 - bm["m"] / bm["o"]) - (1.0 - bm["s"] / bm["o"])
+        out["dry_pace_tax_diff_MBc_minus_PS"] = summary(
+            dt, float((np.nanmean(ps) - np.nanmean(pm)) / np.nanmean(po)))
+    return out
+
+
+def recovery(root: Path, methods, v_eff: dict | None = None, seeds=(0, 1, 2, 3, 4), wheelbase: float = 2.7,
+             n_boot: int = 2000) -> dict:
+    """Exploratory recovery latency (V4, A5.9) from the trace pass, per method against O-R (same seed index):
+    the fraction of runs that recover (enter and hold the O-R band) and the median latency of the recovered runs,
+    each with a hierarchical-bootstrap 95% CI; censored runs are counted as not recovered. E4: Spearman correlation
+    of the recovered runs' latency with the axle transit time L / v_eff."""
+    from scipy.stats import spearmanr
+
+    from eval.latency import recovery_latency
+    tr = root / "trace"
+    out = {}
+    for m in methods:
+        if m == "O-R":
+            continue
+        L, C, sids = [], [], None
+        for s in seeds:
+            fm, fo = tr / f"{m}_s{s}.npz", tr / f"O-R_s{s}.npz"
+            if not (fm.exists() and fo.exists()):
+                continue
+            dm, do = dict(np.load(fm)), dict(np.load(fo))
+            lat, cens = recovery_latency(dm, do)
+            L.append(lat)
+            C.append(cens | ~np.isfinite(lat))
+            sids = list(dm["sid"])
+        if not L:
+            continue
+        lat, cens = np.array(L), np.array(C)
+        rec = (~cens).astype(float)
+        lat_r = np.where(cens, np.nan, lat)
+        rng = np.random.default_rng(10)
+        bf, bm, bmean = np.empty(n_boot), np.empty(n_boot), np.empty(n_boot)
+        for t in range(n_boot):
+            ii = rng.integers(0, lat.shape[0], lat.shape[0])
+            js = rng.integers(0, lat.shape[1], lat.shape[1])
+            bf[t] = rec[ii][:, js].mean()
+            sub = lat_r[ii][:, js]
+            bm[t] = np.nanmedian(sub) if np.isfinite(sub).any() else np.nan
+            bmean[t] = np.nanmean(sub) if np.isfinite(sub).any() else np.nan
+        row = {"n_scenarios": int(lat.shape[1]), "n_runs": int(lat.size),
+               "recovered_frac": summary(bf, float(rec.mean())),
+               "median_latency_recovered_s": (summary(bm[np.isfinite(bm)], float(np.nanmedian(lat_r)))
+                                              if np.isfinite(lat_r).any() else None),
+               "mean_latency_recovered_s": (summary(bmean[np.isfinite(bmean)], float(np.nanmean(lat_r)))
+                                            if np.isfinite(lat_r).any() else None)}
+        if v_eff is not None:
+            transit = np.array([wheelbase / v_eff[s] for s in sids])[None, :].repeat(lat.shape[0], 0)
+            ok = ~cens
+            if ok.sum() >= 10:
+                rho = spearmanr(lat[ok], transit[ok])
+                row["e4_spearman_latency_vs_transit"] = {"rho": float(rho.statistic), "p": float(rho.pvalue),
+                                                         "n_runs": int(ok.sum())}
+        out[m] = row
+    return out
+
+
 def analyze(root: Path, labels: dict, methods, h2_names: list[str] | None = None,
             v_eff: dict | None = None) -> dict:
     main = load_set(root, "main", methods)
@@ -277,6 +358,12 @@ def analyze(root: Path, labels: dict, methods, h2_names: list[str] | None = None
     if v_eff is not None:  # exploratory E6 (A7)
         ve = np.array([v_eff[sids[j]] for j in rf_cols])
         res["exploratory_caution_rf"] = caution(main, rf_cols, ve, methods)
+    if "M-B-c" in main and "P-S" in main:  # exploratory E7 (A7)
+        res["exploratory_e7"] = e7(main, rf_cols, dry, hyp.get("H1"))
+    if (root / "trace").exists():  # exploratory recovery latency (V4, A5.9) and E4
+        rl = recovery(root, methods, v_eff)
+        if rl:
+            res["exploratory_recovery"] = rl
     return res
 
 
@@ -355,4 +442,27 @@ def markdown(res: dict, title: str) -> str:
             a = c["arrival_ratio"]
             bins = " / ".join(f"{b['departed']}/{b['n_runs']}" for b in c["bins"])
             L.append(f"| {m} | {a['estimate']:.3f} [{a['ci95'][0]:.3f}, {a['ci95'][1]:.3f}] | {bins} |")
+    if res.get("exploratory_e7"):
+        e = res["exploratory_e7"]
+        d = e["diff_MBc_minus_PS"]
+        L += ["", "## Exploratory E7 (A7): speed-matched bank MPPI M-B-c vs P-S (reactive-feasible, paired)", "",
+              f"- N = {e['n_scenarios']} scenarios; departure M-B-c {e['dep_MBc']:.3f}, P-S {e['dep_PS']:.3f}; "
+              f"difference {d['estimate']:+.4f} [{d['ci95'][0]:+.4f}, {d['ci95'][1]:+.4f}]."]
+        if "dry_pace_tax_diff_MBc_minus_PS" in e:
+            t = e["dry_pace_tax_diff_MBc_minus_PS"]
+            L.append(f"- Dry pace tax difference (M-B-c - P-S): {t['estimate']:+.4f} "
+                     f"[{t['ci95'][0]:+.4f}, {t['ci95'][1]:+.4f}].")
+        L.append(f"- Student advantage in H1 (point estimate): {e['student_advantage_in_H1']}; M-B-c not higher "
+                 f"than P-S: {e['mbc_not_higher']}; A7 rule -> attributed to caution: {e['attributed_to_caution']}.")
+    if res.get("exploratory_recovery"):
+        L += ["", "## Exploratory: recovery latency vs O-R (V4; H2 subset, nominal truth)", "",
+              "| method | N runs | recovered fraction [95% CI] | median / mean latency of recovered runs [s, 95% CI] | "
+              "E4 Spearman(latency, L/v_eff) |", "|---|---|---|---|---|"]
+        for m, r in res["exploratory_recovery"].items():
+            f, md, mn = r["recovered_frac"], r["median_latency_recovered_s"], r.get("mean_latency_recovered_s")
+            e4 = r.get("e4_spearman_latency_vs_transit")
+            L.append(f"| {m} | {r['n_runs']} | {f['estimate']:.3f} [{f['ci95'][0]:.3f}, {f['ci95'][1]:.3f}] | "
+                     + (f"{md['estimate']:.2f} [{md['ci95'][0]:.2f}, {md['ci95'][1]:.2f}] / "
+                        f"{mn['estimate']:.2f} [{mn['ci95'][0]:.2f}, {mn['ci95'][1]:.2f}]" if md else "--") + " | "
+                     + (f"{e4['rho']:+.3f} (p = {e4['p']:.3g}, n = {e4['n_runs']})" if e4 else "--") + " |")
     return "\n".join(L) + "\n"

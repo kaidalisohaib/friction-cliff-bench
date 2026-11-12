@@ -263,6 +263,93 @@ def ci_pp(e):
     return f"{pct(e['estimate'])}\\,pp [{pct(e['ci95'][0])}, {pct(e['ci95'][1])}]"
 
 
+LEARNED = ["P-T", "P-TP", "P-DR", "P-S", "P-SP"]
+
+
+def ci3(e, k=3):
+    return f"{e['estimate']:.{k}f} [{e['ci95'][0]:.{k}f}, {e['ci95'][1]:.{k}f}]"
+
+
+def s2_tex(res, s2_path=Path("ledgers/s2_gate_A8.json")) -> list[str]:
+    """Gate S2 caveat (A8) and the per-seed reactive-feasible departure table; placed before H1."""
+    L = []
+    ps = res.get("per_seed_rf_departure", {})
+    if s2_path.exists():
+        s2 = json.loads(s2_path.read_text())
+        pt, o = s2["P-T"], s2["O-R"]
+        L.append("\\paragraph{Caveat: gate S2 failed.} On the reactive-feasible tuning scenarios the final teacher P-T "
+                 f"departed on {pt['departure']:.3f} of $N={pt['n_runs']:,}$ runs (Wilson 95\\% "
+                 f"[{pt['wilson'][0]:.3f}, {pt['wilson'][1]:.3f}]) against {o['departure']:.3f} for O-R, above the "
+                 f"{s2['S2']['margin_pp']:.0f}\\,pp limit, also after the collapse rollback of amendment A8. As A8 "
+                 "fixed in advance, the results below are reported with this caveat; all seeds count, none is "
+                 "dropped. The spread is between seeds, so the per-seed test departure is reported too.")
+    if ps:
+        rows = [m for m in LEARNED + ["M-L"] if m in ps]
+        if rows:
+            L.append("\\begin{table}[t]\\centering\\small\\begin{tabular}{@{}l" + "c" * len(ps[rows[0]]) +
+                     "@{}}\\toprule method & " + " & ".join(f"seed {i}" for i in range(len(ps[rows[0]]))) +
+                     "\\\\\\midrule")
+            for m in rows:
+                L.append(f"{m} & " + " & ".join(f"{x:.3f}" for x in ps[m]) + "\\\\")
+            L.append("\\bottomrule\\end{tabular}\\caption{Reactive-feasible test departure per training seed "
+                     "(each seed is one trained policy or estimator, evaluated over all reactive-feasible "
+                     "scenarios).}\\label{tab:seeds}\\end{table}\n")
+    return L
+
+
+def exploratory_tex(res) -> list[str]:
+    """Secondary dry pace, exploratory E6/E7 (A7) and recovery latency."""
+    L = []
+    sec = res.get("secondary_rf", {})
+    tax = {m: r["dry_pace_tax"] for m, r in sec.items() if "dry_pace_tax" in r}
+    if tax:
+        L.append("\\paragraph{Dry pace (secondary).} Progress lost against O-R on the dry set (no drop; 95\\% CI): "
+                 + "; ".join(f"{m} {ci3(t)}" for m, t in tax.items()) + ".\n")
+    cau = res.get("exploratory_caution_rf", {})
+    if cau:
+        L.append("\\paragraph{Exploratory E6: arrival speed.} Mean arrival speed at the drop as a fraction of the "
+                 "scenario's effective speed, reactive-feasible scenarios (95\\% CI): "
+                 + "; ".join(f"{m} {ci3(c['arrival_ratio'])}" for m, c in cau.items()) + ".")
+        lo_bins = []
+        for m, c in cau.items():
+            b = c["bins"][3]
+            if b["n_runs"] >= 20:
+                lo_bins.append(f"{m} {b['departed']}/{b['n_runs']}")
+        if lo_bins:
+            L.append(" Departures among runs arriving at $\\geq 1.0\\,v_\\mathrm{eff}$: " + ", ".join(lo_bins) + ".")
+        L.append("\n")
+    e = res.get("exploratory_e7")
+    if e:
+        d = e["diff_MBc_minus_PS"]
+        txt = (f"\\paragraph{{Exploratory E7: adaptation or caution?}} M-B-c is the bank MPPI driving at "
+               f"$c$ times its reference speed, with $c$ frozen from the student's arrival speed on tuning data. "
+               f"On {e['n_scenarios']:,} reactive-feasible scenarios it departs {e['dep_MBc']:.3f} against "
+               f"{e['dep_PS']:.3f} for P-S; the paired difference M-B-c $-$ P-S is {ci_pp(d)}.")
+        if "dry_pace_tax_diff_MBc_minus_PS" in e:
+            txt += f" Its dry pace tax exceeds P-S's by {ci_pp(e['dry_pace_tax_diff_MBc_minus_PS'])}."
+        if not e["student_advantage_in_H1"]:
+            txt += (" The student does not depart less than the better adaptive MPPI in H1, so the A7 rule has no "
+                    "advantage to attribute.")
+        elif e["attributed_to_caution"]:
+            txt += (" By the rule fixed in A7 before the test run, the student's H1 advantage is attributed to "
+                    "caution (arriving slower), not to adaptation.")
+        else:
+            txt += (" M-B-c departs more than P-S, so by the A7 rule the student's H1 advantage is not explained by "
+                    "its lower arrival speed alone.")
+        L.append(txt + "\n")
+    rec = res.get("exploratory_recovery")
+    if rec:
+        parts = []
+        for m, r in rec.items():
+            md, mn = r["median_latency_recovered_s"], r.get("mean_latency_recovered_s")
+            parts.append(f"{m}: recovered {ci3(r['recovered_frac'])}"
+                         + (f", latency median {ci3(md, 2)}\\,s, mean {ci3(mn, 2)}\\,s" if md else "") + f" ($N={r['n_runs']:,}$ runs)")
+        L.append("\\paragraph{Exploratory: recovery latency.} Time from the drop until the car holds O-R's lateral "
+                 "error and yaw-rate band for 0.5\\,s (H2 subset, nominal truth; censored runs count as not "
+                 "recovered): " + "; ".join(parts) + ".\n")
+    return L
+
+
 def write_tex(res, labels, gen: Path, has):
     """Tech-report fragments (paper/gen/*.tex): every number comes from results.json of this run."""
     gen.mkdir(parents=True, exist_ok=True)
@@ -278,11 +365,12 @@ def write_tex(res, labels, gen: Path, has):
     n_seeds = round(rf["O-R"]["departed"]["n_runs"] / rf["n_scenarios"]) if "O-R" in rf else "the"
     L.append(f"All rates pool {n_seeds} seeds per method; intervals are hierarchical-bootstrap 95\\% CIs over scenarios and "
              "seeds unless marked otherwise. Departure means any footprint corner beyond the lane edge.\n")
+    L += s2_tex(res)
     # per-class table
     cls = [c for c in CLASSES if res["classes"].get(c, {}).get("n_scenarios", 0) > 0]
     ms = [m for m in METHODS if any(m in res["classes"][c] for c in cls)]
     L.append("\\begin{table}[t]\\centering\\small\\setlength{\\tabcolsep}{3pt}")
-    L.append("\\begin{tabular}{@{}l" + "c" * len(cls) + "@{}}\\toprule")
+    L.append("\\resizebox{\\linewidth}{!}{\\begin{tabular}{@{}l" + "c" * len(cls) + "@{}}\\toprule")
     L.append("method & " + " & ".join(f"{c} ($N={res['classes'][c]['n_scenarios']}$)" for c in cls) + "\\\\\\midrule")
     for m in ms:
         cells = []
@@ -292,7 +380,7 @@ def write_tex(res, labels, gen: Path, has):
                          f"{r['departed']['rate']:.3f} {{\\scriptsize[{r['departed']['boot95'][0]:.3f}, "
                          f"{r['departed']['boot95'][1]:.3f}]}}")
         L.append(f"{m} & " + " & ".join(cells) + "\\\\")
-    L.append("\\bottomrule\\end{tabular}\\caption{Lane-departure rate by feasibility class (95\\% CI).}"
+    L.append("\\bottomrule\\end{tabular}}\\caption{Lane-departure rate by feasibility class (95\\% CI).}"
              "\\label{tab:classes}\\end{table}\n")
     if "H1" in hyp:
         h = hyp["H1"]
@@ -332,6 +420,7 @@ def write_tex(res, labels, gen: Path, has):
         L.append("Holm--Bonferroni over the confirmatory family: " + ", ".join(
             f"{k} $p={p:.4f}$ ({'rejected' if res['holm']['rejected'][k] else 'not rejected'})"
             for k, p in res["holm"]["p"].items()) + ".\n")
+    L += exploratory_tex(res)
     figs = [("fig_departure_by_class.png", "Departure by feasibility class and method."),
             ("fig_regime_map.png", "Reactive-feasible departure rate over post-drop surface and effective speed."),
             ("fig_h1.png", "H1: paired departure difference with its 95\\% CI against the $\\pm5$\\,pp margin."),

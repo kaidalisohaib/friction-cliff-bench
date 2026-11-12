@@ -11,8 +11,8 @@ friction model: the friction-blind planner keeps believing it can turn.*
 
 **Status (Nov 2026):** simulator, feasibility labelling, oracles, adaptive MPPI, RL arm and the C++/CUDA MPPI are
 built and tested. The 4,000-scenario test pool is labelled and frozen
-([class breakdown](docs/figures/labels_test_T0.md)), and the methods are being tuned on the tuning split.
-**No controller results yet.** The protocol was
+([class breakdown](docs/figures/labels_test_T0.md)), every method is tuned under the logged budget and trained with
+5 seeds, and the confirmatory test evaluation is running. The protocol was
 [pre-registered](docs/PREREGISTRATION.md) (`prereg-v1`) before any test scenario was labelled or evaluated; later
 changes are dated amendments.
 
@@ -56,7 +56,7 @@ fingerprinted in CI; tuning trials and GPU-hours are logged per method.
 ## What is pre-registered
 Hypotheses H1–H3 with falsifiers, metrics and statistics (hierarchical bootstrap, TOST at a ±5 pp margin, Holm),
 the scenario sampler and seeds, the tuning budget, the oracle settings, and the evaluation plan. See
-[`docs/PREREGISTRATION.md`](docs/PREREGISTRATION.md); every later change is a dated amendment (A1–A5) with its
+[`docs/PREREGISTRATION.md`](docs/PREREGISTRATION.md); every later change is a dated amendment (A1–A8) with its
 reason in [`docs/DECISIONS.md`](docs/DECISIONS.md).
 
 ## Run it
@@ -72,6 +72,12 @@ MPPI_BACKEND=cpp PYTHONPATH=. uv run pytest -q tests/test_mppi_cpp.py   # C++ vs
 The simulated car's steady-state understeer is compared with ten passenger-car platforms from openpilot driving logs
 ([commaSteeringControl](https://huggingface.co/datasets/commaai/commaSteeringControl), MIT). The steering ratio is
 fitted, not assumed. Script, table and figure: [`docs/results/grounding/`](docs/results/grounding/comma_understeer.md).
+
+## Results
+<!-- RESULTS:BEGIN -->
+Pending: the confirmatory test evaluation is running. This block is generated from the harness output by
+`scripts/readme_results.py`.
+<!-- RESULTS:END -->
 
 ## Limitations (by design)
 Simulation only, with a planar single-track (bicycle) model; one vehicle; friction drops along the lane only.
