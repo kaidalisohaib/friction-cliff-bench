@@ -98,6 +98,17 @@ class PPOConfig:
     bc_reg: float = 0.0  # weight of a BC term (actor mean vs the path follower) in the PPO loss, decaying linearly
     bc_reg_end: float = 0.5  # ... to 0 at this fraction of training (D27)
     bc_steps: int = 2000  # behavior-cloning warm start of the actor on the shared path follower (D27); 0 = off
+    # collapse rollback (D33, prereg A8): when the windowed training success stays below rollback_frac x the best so
+    # far for rollback_patience consecutive log points, restore the best checkpoint (actor, critic, std) and halve
+    # the actor learning rate; at most rollback_max times per run. A run that never collapses is unaffected.
+    rollback_frac: float = 0.5
+    rollback_patience: int = 3
+    rollback_max: int = 3
+
+
+def should_rollback(recent: list[float], best: float, frac: float, patience: int) -> bool:
+    """True when the last `patience` windowed success values are all below frac x best (D33)."""
+    return best > 0 and len(recent) >= patience and all(x < frac * best for x in recent[-patience:])
 
 
 def _inputs(env: FrictionEnv):
@@ -160,6 +171,8 @@ def train_ppo(kind: str, lib: dict, cfg: PPOConfig, seed: int = 0, device: str =
     rstat = [0.0, 1.0, 1e-4]  # mean, var, count of the discounted returns
     best = (-1.0, None, -1)
     win_s, win_r = [], []
+    lr_scale, n_rollback, since_best = 1.0, 0, []
+    hist["rollbacks"] = []
     t0 = time.time()
     f, pv, pr = _inputs(env)
     for it in range(iters):
@@ -207,7 +220,7 @@ def train_ppo(kind: str, lib: dict, cfg: PPOConfig, seed: int = 0, device: str =
         warm = it < cfg.critic_warmup
         stop = False
         for g in opt.param_groups:
-            g["lr"] = cfg.lr * max(0.0, 1.0 - max(it - cfg.critic_warmup, 0) / max(iters - cfg.critic_warmup, 1))
+            g["lr"] = lr_scale * cfg.lr * max(0.0, 1.0 - max(it - cfg.critic_warmup, 0) / max(iters - cfg.critic_warmup, 1))
         for _ in range(cfg.epochs):
             if stop:
                 break
@@ -247,6 +260,20 @@ def train_ppo(kind: str, lib: dict, cfg: PPOConfig, seed: int = 0, device: str =
                 f"std {ac.log_std.exp().tolist()} {time.time() - t0:.0f}s")
             if not warm and len(win_s) >= 500 and s > best[0]:
                 best = (s, {k: v.detach().clone() for k, v in ac.state_dict().items()}, it)
+                since_best = []
+            elif not warm and len(win_s) >= 500:
+                since_best.append(s)
+                if (n_rollback < cfg.rollback_max and best[1] is not None
+                        and should_rollback(since_best, best[0], cfg.rollback_frac, cfg.rollback_patience)):
+                    ac.load_state_dict(best[1])
+                    lr_scale *= 0.5
+                    n_rollback += 1
+                    since_best = []
+                    opt = torch.optim.Adam(a_params, lr=cfg.lr)  # fresh moments after the rollback
+                    opt_c = torch.optim.Adam(ac.critic.parameters(), lr=cfg.lr_critic)
+                    hist["rollbacks"].append(it)
+                    log(f"[{kind}] collapse rollback {n_rollback} at it {it} to it {best[2]} "
+                        f"(success {s:.3f} < {cfg.rollback_frac} x {best[0]:.3f}); actor lr x{lr_scale}")
             win_s, win_r = [], []
         if time_budget_s and time.time() - t0 > time_budget_s:
             log(f"[{kind}] time budget reached at it {it}")

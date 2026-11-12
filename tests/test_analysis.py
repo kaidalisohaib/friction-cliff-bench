@@ -87,3 +87,19 @@ def test_markdown_renders(tmp_path):
     res = A.analyze(tmp_path, _labels(), ["O-R", "M-B", "P-S"])
     md = A.markdown(res, "synthetic")
     assert "## H1" in md and "reactive-feasible" in md
+
+
+def test_caution_bins_split_departures_by_arrival_speed():
+    # method "A" arrives slow and never departs; "B" arrives at v_eff and departs in half of the runs
+    n_sc, ve = 40, np.full(40, 20.0)
+
+    def runs(av, dep):
+        return {"sids": [f"s{j}" for j in range(n_sc)],
+                "recs": [[{"arrival_v": av, "departed": bool(dep and j % 2)} for j in range(n_sc)] for _ in range(3)]}
+
+    main = {"A": runs(14.0, False), "B": runs(20.0, True)}
+    out = A.caution(main, list(range(n_sc)), ve, ["A", "B"])
+    assert abs(out["A"]["arrival_ratio"]["estimate"] - 0.7) < 1e-9
+    assert out["A"]["bins"][0]["n_runs"] == 120 and out["A"]["bins"][0]["departed"] == 0
+    b = out["B"]["bins"][3]  # ratio 1.0 falls in [1.0, inf)
+    assert b["n_runs"] == 120 and b["departed"] == 60

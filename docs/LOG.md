@@ -27,6 +27,24 @@ Format per entry: date, phase, hours, what was done, and the verdict for any run
 
 ## Entries
 
+### 2026-11-11 late night: tuning complete except P-DR; A7 (caution); S2 failed → A8 rollback; engineering, not results
+- **Tuning** (best objective on the 307 RF tuning scenarios; ledger in `ledgers/`):
+  - P-T 0.0113 (14 trials, 6.26 GPU-h);
+  - P-S 0.0 (6, 0.14);
+  - P-TP 0.0067 (14);
+  - P-SP 0.0033 (6, 0.12);
+  - P-DR still running.
+- **A7/D32.** The tuned policies arrive at the drop at ~0.65 × v_eff (MPPI: 0.9–1.0). Exploratory E6
+  (arrival speed) and E7 (M-B-c) were added before any test evaluation. Dry check with c = 0.65: M-B-c departed
+  on 0/44 RF tuning runs, like the student.
+- **Final training v1** (5 seeds; P-T/P-S/P-TP/P-SP/M-L). The S2 gate failed:
+  - P-T departure 0.195 pooled (N = 1,535); per seed 0.010 / 0.182 / 0.000 / 0.039 / 0.746.
+  - Seeds 1 and 4 collapsed mid-training. P-S inherited it (seed 4: 0.687).
+  - Prediction (P3 notes): the stabilizers were enough. Wrong for 2 of 5 seeds: tuning only ever saw seed 0.
+- **Fix (A8/D33).** Collapse rollback (restore best, halve the actor LR, ≤ 3 times). The rule is unit-tested.
+  - v1 checkpoints archived in `runs/final_v1_prefix_A8/`. All PPO final seeds are being retrained; then S2 again,
+    then c (`caution_c.py`) from the new P-S seeds.
+
 ### 2026-11-11 night: G2 passed, prereg A6, P5 grounding, tech report skeleton; engineering, not results
 - **G2.** The test pool is labelled with the frozen A4 oracles (wall 3.95 h on a shared GPU).
   - Classes: RF 3,009 / PR 755 / CI 29 / UD 207; adaptation-required 363. S1: 0 violations.

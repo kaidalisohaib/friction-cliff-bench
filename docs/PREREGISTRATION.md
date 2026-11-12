@@ -294,3 +294,48 @@ Written after a pipeline dry run on the **tuning** split. No test scenario has b
 - 3,009 ≥ 1,000 reactive-feasible, so no top-up block is labelled (A5.10).
 - The label file `labels/test_v1_T0.jsonl` is frozen by SHA-256 `7671fb0f…13d6` (`tests/test_frozen.py`).
 - No method has been run on any test scenario.
+
+### A7 (2026-11-11): adaptation or caution? Exploratory E6/E7, declared before any test evaluation (D32)
+Written after tuning-split runs of the tuned teacher and student. No method has been run on any test scenario.
+- **Observation (tuning data, engineering).**
+  - The learned policies arrive at the drop at about 0.65 × v_eff; the MPPI methods arrive at about 0.9–1.0.
+  - Every training and evaluation episode contains a drop about 4 s after handover. A policy trained on that
+    distribution can learn to slow down pre-emptively; the MPPI methods plan with the current or estimated
+    friction and have no such prior.
+  - V1 accepted this risk–pace trade-off for every method, and the dry pace tax reports its cost. But a lower
+    departure rate bought by slowing down would look like successful adaptation in H1.
+- **Unchanged.** H1–H3, their tests and the Holm family. The following are **exploratory** and outside the Holm
+  family.
+- **E6: arrival speed.** On reactive-feasible test scenarios, per method:
+  - the mean of (front-axle speed at the drop) / v_eff, with a hierarchical-bootstrap 95% CI;
+  - the departure rate within arrival-ratio bins [0, 0.8), [0.8, 0.9), [0.9, 1.0), [1.0, ∞), with Wilson 95%
+    CIs.
+  - Runs that never reach the drop are counted separately.
+- **E7: speed-matched bank MPPI (M-B-c).** M-B with its reference speed scaled by c.
+  - c = the mean arrival ratio of the five final P-S seeds on the reactive-feasible **tuning** scenarios
+    (`scripts/caution_c.py`). It is frozen in `ledgers/caution_c.json` before any test evaluation.
+  - M-B-c otherwise keeps the tuned M-B settings and noise seeds. It runs on the main and dry sets.
+  - Reported: departure (main) and dry pace tax against P-S, paired, with 95% CIs.
+  - Interpretation, fixed now: if M-B-c's departure is not higher than P-S's (CI of the difference includes 0 or
+    favours M-B-c), the student's H1 advantage is attributed to caution, not to adaptation.
+
+### A8 (2026-11-11): S2 failed; PPO collapse rollback (D33)
+No method has been run on any test scenario.
+- **S2 result (tuning data).** The final P-T at the tuned configuration, 5 seeds, departed on 0.195 of the RF
+  tuning runs (N = 1,535; O-R + 5 pp is the limit). S2 failed.
+  - Per seed: 0.010, 0.182, 0.000, 0.039, 0.746.
+  - Seeds 1 and 4 collapsed mid-training: windowed training success went from ~0.5–0.6 to ~0 and never
+    recovered. The kept best checkpoint is an early, weak one.
+  - V5 reads a gap this large as "training is broken". Tuning scored each configuration on seed 0 only, so it
+    could not see the instability.
+- **Fix, for every PPO method (P-T, P-TP, P-DR, so also P-S and P-SP via their teachers) and every seed.** When the
+  windowed training success stays below 0.5 × its best so far for 3 consecutive log points (30 iterations),
+  restore the best checkpoint (actor, critic, std), reset the optimisers and halve the actor learning rate. At
+  most 3 times per run.
+  - A run that never collapses trains exactly as before. That includes the tuning runs, so the tuned
+    configurations stay valid.
+- **Unchanged:** the tuned hyperparameters and the training length. Tuning trials are not rerun.
+- **All seeds of the new procedure are reported** (never best-of). The pre-A8 final checkpoints are archived in
+  `runs/final_v1_prefix_A8/` with their S2 numbers (LOG). c for E7 is recomputed from the new P-S seeds.
+- **If S2 still fails after A8:** the policy class is reported as failing S2, and H1–H3 are run and reported with
+  that caveat, not withheld.

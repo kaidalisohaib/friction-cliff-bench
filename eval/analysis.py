@@ -203,7 +203,33 @@ def secondary(main: dict, cols, dry: dict, methods) -> dict:
     return out
 
 
-def analyze(root: Path, labels: dict, methods, h2_names: list[str] | None = None) -> dict:
+ARRIVAL_BINS = (0.0, 0.8, 0.9, 1.0, np.inf)  # arrival speed / v_eff (prereg A7)
+
+
+def caution(main: dict, cols, v_eff: np.ndarray, methods) -> dict:
+    """Exploratory E6 (prereg A7): is a method safer because it arrives slower? Per method on the given scenarios:
+    the mean arrival-speed ratio (front axle at the drop, / v_eff) with a bootstrap 95% CI, and the departure
+    rate within arrival-ratio bins (pooled runs, Wilson 95%). Runs that never reach the drop have no ratio."""
+    out = {}
+    for m in methods:
+        if m not in main:
+            continue
+        av = mat(main, m, "arrival_v", cols) / v_eff[None, :]
+        dep = mat(main, m, "departed", cols)
+        bm = boot_means({"r": av}, n_boot=2000, seed=7)["r"]
+        bins = []
+        for lo, hi in zip(ARRIVAL_BINS[:-1], ARRIVAL_BINS[1:]):
+            sel = np.isfinite(av) & (av >= lo) & (av < hi)
+            k, n = int(np.nansum(dep[sel])), int(sel.sum())
+            bins.append({"lo": lo, "hi": None if np.isinf(hi) else hi, "n_runs": n, "departed": k,
+                         "rate": k / n if n else None, "wilson95": list(St.wilson(k, n)) if n else None})
+        out[m] = {"arrival_ratio": summary(bm, float(np.nanmean(av))), "bins": bins,
+                  "n_no_arrival": int((~np.isfinite(av)).sum())}
+    return out
+
+
+def analyze(root: Path, labels: dict, methods, h2_names: list[str] | None = None,
+            v_eff: dict | None = None) -> dict:
     main = load_set(root, "main", methods)
     sids = main["O-R"]["sids"]
     rf_cols = [j for j, s in enumerate(sids) if labels[s]["label"] == "reactive-feasible"]
@@ -245,6 +271,9 @@ def analyze(root: Path, labels: dict, methods, h2_names: list[str] | None = None
         res["holm"] = {"p": pv, "rejected": St.holm(pv)}
     res["hypotheses"] = hyp
     res["secondary_rf"] = secondary(main, rf_cols, dry, methods)
+    if v_eff is not None:  # exploratory E6 (A7)
+        ve = np.array([v_eff[sids[j]] for j in rf_cols])
+        res["exploratory_caution_rf"] = caution(main, rf_cols, ve, methods)
     return res
 
 
@@ -311,4 +340,12 @@ def markdown(res: dict, title: str) -> str:
                 return f"{r[k]['estimate']:+.{nd}f} [{r[k]['ci95'][0]:+.{nd}f}, {r[k]['ci95'][1]:+.{nd}f}]"
             L.append(f"| {m} | {f('regret_max_abs_ey')} | {f('regret_time_out_of_lane')} | {f('regret_progress', 1)} | "
                      f"{f('dry_pace_tax', 4)} |")
+    if res.get("exploratory_caution_rf"):
+        L += ["", "## Exploratory E6 (A7): arrival speed at the drop (reactive-feasible)", "",
+              "| method | arrival / v_eff [95% CI] | departure by arrival bin <0.8 / 0.8–0.9 / 0.9–1.0 / ≥1.0 (k/n) |",
+              "|---|---|---|"]
+        for m, c in res["exploratory_caution_rf"].items():
+            a = c["arrival_ratio"]
+            bins = " / ".join(f"{b['departed']}/{b['n_runs']}" for b in c["bins"])
+            L.append(f"| {m} | {a['estimate']:.3f} [{a['ci95'][0]:.3f}, {a['ci95'][1]:.3f}] | {bins} |")
     return "\n".join(L) + "\n"

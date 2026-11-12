@@ -1,0 +1,16 @@
+{
+ "method": "P-S",
+ "best_params": {
+  "hist_len": 12,
+  "hidden": 64,
+  "lr": 0.0023382678345482836
+ },
+ "best_value": 0.0,
+ "n_trials": 6,
+ "gpu_hours": 0.1372711588939031,
+ "stopped_by": "trials",
+ "tag": "P-S_1794440793",
+ "n_tuning_rf": 307,
+ "git": "929ae5165cfd3c676986e2b4eb15ae3ff15a5a4e",
+ "checkpoint": "runs/tuning/P-S_1794440793.pt"
+}

@@ -36,7 +36,7 @@ from sim.params import VehicleParams
 
 TUNE = Path("runs/tuning")
 FINAL = Path("runs/final")
-MPPI_METHODS = ("O-R", "O-C", "M-N", "M-B", "M-L")
+MPPI_METHODS = ("O-R", "O-C", "M-N", "M-B", "M-L", "M-B-c")
 POLICY_KIND = {"P-T": "teacher", "P-TP": "teacher_preview", "P-DR": "dr", "P-S": "student", "P-SP": "student"}
 H2_LEVELS = {"slip": (0.25, 0.5, 1.0), "relax": (0.2, 0.4, 0.6), "delay": (3, 5, 7)}
 H2_SUBSET_N = 500
@@ -161,6 +161,10 @@ def factory(method: str, seed: int, truth: VehicleParams):
     if method == "M-B":
         cfg, W = mppi_cfg("M-B"), best("M-B")["best_params"]["W"]
         return lambda sim, sub, ss, sd: BankMPPI(sim, sub, cfg, sd, ss, W)
+    if method == "M-B-c":  # exploratory E7 (prereg A7): M-B at the student's arrival speed
+        cfg, W = mppi_cfg("M-B"), best("M-B")["best_params"]["W"]
+        c = json.loads((FINAL / "caution_c.json").read_text())["c"]
+        return lambda sim, sub, ss, sd: BankMPPI(sim, sub, cfg, sd, ss, W, v_ref_scale=c)
     if method == "M-L":
         cfg = mppi_cfg("M-L")
         est = load_estimator(FINAL / f"M-L_s{seed}.pt")

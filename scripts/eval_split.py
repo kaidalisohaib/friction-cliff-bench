@@ -21,7 +21,7 @@ SPLITS = {
     "tuning": (["splits/tuning_v1.jsonl", "splits/tuning_v1_b2.jsonl"],
                ["labels/tuning_v1.jsonl", "labels/tuning_v1_b2.jsonl"]),
 }
-ALL = ["O-R", "O-C", "M-N", "M-B", "M-L", "P-T", "P-TP", "P-DR", "P-S", "P-SP"]
+ALL = ["O-R", "O-C", "M-N", "M-B", "M-L", "P-T", "P-TP", "P-DR", "P-S", "P-SP", "M-B-c"]  # M-B-c: E7 (A7)
 H2_METHODS = ["O-R", "M-B", "M-L", "P-S", "P-DR"]
 
 
@@ -46,14 +46,17 @@ def main():
         labels = a.labels.split(",")
     if a.split == "test":
         prereg = Path("docs/PREREGISTRATION.md").read_text()
-        if "### A5" not in prereg or "### A6" not in prereg:
-            raise SystemExit("test-split evaluation needs prereg amendments A5 (evaluation plan) and A6 first")
+        if not all(f"### A{i}" in prereg for i in (5, 6, 7)):
+            raise SystemExit("test-split evaluation needs prereg amendments A5-A7 first")
         if not use_cpp():
             raise SystemExit("confirmatory runs use the C++ MPPI backend (D29): set MPPI_BACKEND=cpp")
         if a.final_dir or a.limit:
             raise SystemExit("the test split is evaluated in full, only with runs/final checkpoints")
     if a.final_dir:
         R.FINAL = Path(a.final_dir)
+    want = a.methods.split(",") if a.methods else ALL
+    if a.split == "test" and "M-B-c" in want and not (R.FINAL / "caution_c.json").exists():
+        raise SystemExit("M-B-c needs c frozen from tuning data first (scripts/caution_c.py, prereg A7)")
     out = Path(a.out or f"runs/eval_{a.split}")
     seeds = [int(s) for s in a.seeds.split(",")]
     sets = []

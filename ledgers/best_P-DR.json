@@ -1,0 +1,19 @@
+{
+ "method": "P-DR",
+ "best_params": {
+  "lr": 3.613276697873342e-05,
+  "init_std": 0.08965531298579038,
+  "init_std_long": 0.19440307588485697,
+  "reward_scale": 0.0061493855793945,
+  "gamma": 0.995,
+  "width": 256
+ },
+ "best_value": 0.013276872964169382,
+ "n_trials": 20,
+ "gpu_hours": 2.6177466002437804,
+ "stopped_by": "trials",
+ "tag": "P-DR_1794445401",
+ "n_tuning_rf": 307,
+ "git": "ef61bb9e8c179e70452bd1ac8b8b697c4ce74254",
+ "checkpoint": "runs/tuning/P-DR_1794445401.pt"
+}

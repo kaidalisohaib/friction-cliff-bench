@@ -117,18 +117,19 @@ class _AdaptiveBase:
     """Shared plumbing: an MPPI on the sim's cars, a feature/observation pipeline, model updates per step."""
 
     def __init__(self, sim, scs, cfg: MPPIConfig, seed: int, snap: dict, method: str, hist_len: int,
-                 model_params: VehicleParams = VehicleParams(), noise_scale: float = 1.0):
+                 model_params: VehicleParams = VehicleParams(), noise_scale: float = 1.0, v_ref_scale: float = 1.0):
         self.sim, self.n = sim, sim.n
         share_stream(sim.device)
+        from scenarios import sampler as S
+        v_ref = np.array([v_ref_scale * S.v_eff(sc) for sc in scs], np.float32)  # E7 (prereg A7): scale < 1
         self.mppi = make_mppi(sim, cfg, seed=np.array([run_seed(sc.sid, method, seed) for sc in scs]),
-                         model_params=model_params)
+                              model_params=model_params, v_ref=v_ref)
         self.mppi.reset(snap["buf"][:, 0, :])
         self.base_params = wp.clone(self.mppi.mparams)
         self.feat = Features(sim, hist_len, seeds=np.array([run_seed(sc.sid, method + "-obs", seed) for sc in scs]),
                              noise_scale=noise_scale)
         self.dev = self.feat.dev
-        from scenarios import sampler as S
-        self.feat.v_ref[:] = torch.tensor([S.v_eff(sc) for sc in scs], dtype=torch.float32, device=self.dev)
+        self.feat.v_ref[:] = torch.tensor(v_ref, dtype=torch.float32, device=self.dev)
         self.surf_base = torch.tensor(np.stack([surface_vec(SURFACES[k]) for k in SURF_NAMES]), device=self.dev)
         dry = surface_vec(SURFACES["dry"], MU_NOMINAL_DRY)
         self.set_model(np.broadcast_to(dry, (self.n, 8)), np.broadcast_to(dry, (self.n, 8)), np.zeros(self.n, np.int32))
@@ -169,9 +170,9 @@ class BankMPPI(_AdaptiveBase):
     """M-B."""
 
     def __init__(self, sim, scs, cfg: MPPIConfig, seed: int, snap: dict, window: int, noise_scale: float = 1.0,
-                 mu_points: dict = BANK_MU):
+                 mu_points: dict = BANK_MU, v_ref_scale: float = 1.0):
         self.W = int(window)
-        super().__init__(sim, scs, cfg, seed, snap, "M-B", 1, noise_scale=noise_scale)
+        super().__init__(sim, scs, cfg, seed, snap, "M-B", 1, noise_scale=noise_scale, v_ref_scale=v_ref_scale)
         self.models, vecs = bank_models(mu_points)
         d = sim.device
         self.cand_sf = wp.array(vecs, dtype=vec8, device=d)

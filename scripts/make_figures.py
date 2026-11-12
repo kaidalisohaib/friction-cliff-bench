@@ -8,6 +8,7 @@ Writes <out>/results.json (every number, eval/analysis.py), <out>/results.md (ta
   fig_regime_map.png          departure rate per method over post-drop surface x effective speed (reactive-feasible)
   fig_h1.png                  paired H1 difference with its 95% CI against the +-5 pp margin
   fig_h2.png                  regret vs O-R over each mismatch axis (when the H2 sets exist)
+  fig_caution.png             exploratory E6 (A7): RF departure vs arrival speed at the drop / v_eff, per method
   fig_mechanism.png           exploratory (trace set): adaptive MPPI's model friction vs the true friction under the
                               front axle, aligned at the drop (median and IQR over runs)
 """
@@ -28,9 +29,9 @@ from eval import analysis as A  # noqa: E402
 from eval.runner import h2_set_names, load_labels  # noqa: E402
 from scenarios import sampler as S  # noqa: E402
 
-METHODS = ["O-R", "O-C", "M-N", "M-B", "M-L", "P-T", "P-TP", "P-DR", "P-S", "P-SP"]
+METHODS = ["O-R", "O-C", "M-N", "M-B", "M-L", "P-T", "P-TP", "P-DR", "P-S", "P-SP", "M-B-c"]
 COLORS = {"O-R": "#555555", "O-C": "#999999", "M-N": "#b07aa1", "M-B": "#4e79a7", "M-L": "#76b7b2",
-          "P-T": "#f28e2b", "P-TP": "#ffbe7d", "P-DR": "#e15759", "P-S": "#59a14f", "P-SP": "#8cd17d"}
+          "P-T": "#f28e2b", "P-TP": "#ffbe7d", "P-DR": "#e15759", "P-S": "#59a14f", "P-SP": "#8cd17d", "M-B-c": "#a0cbe8"}
 CLASSES = ["reactive-feasible", "adaptation-required", "preview-required", "certified-infeasible", "undetermined"]
 
 
@@ -48,8 +49,8 @@ def fig_by_class(res, out):
             d = r["departed"]
             xs.append(j + (i - (len(ms) - 1) / 2) * w)
             ys.append(d["rate"])
-            lo.append(d["rate"] - d["boot95"][0])
-            hi.append(d["boot95"][1] - d["rate"])
+            lo.append(max(d["rate"] - d["boot95"][0], 0))  # the pooled rate can sit just outside a percentile CI
+            hi.append(max(d["boot95"][1] - d["rate"], 0))
         ax.bar(xs, ys, width=w, color=COLORS.get(m), label=m, yerr=[lo, hi], capsize=1.5, error_kw={"lw": 0.7})
     ax.set_xticks(range(len(cls)))
     ax.set_xticklabels([f"{c}\n(N = {res['classes'][c]['n_scenarios']})" for c in cls], fontsize=8)
@@ -149,6 +150,52 @@ def fig_h2(res, out):
                  + " scenarios per level)", fontsize=9)
     fig.tight_layout()
     fig.savefig(out / "fig_h2.png", dpi=140)
+
+
+def fig_caution(res, out):
+    """Exploratory E6 (prereg A7): is a method safer because it arrives slower?"""
+    ca = res.get("exploratory_caution_rf")
+    rf = res["classes"].get("reactive-feasible", {})
+    if not ca:
+        return
+    fig, axs = plt.subplots(1, 2, figsize=(11, 3.8))
+    ax = axs[0]
+    for m, c in ca.items():
+        if m not in rf:
+            continue
+        x, d = c["arrival_ratio"], rf[m]["departed"]
+        ax.errorbar(x["estimate"], d["rate"], xerr=[[max(x["estimate"] - x["ci95"][0], 0)], [max(x["ci95"][1] - x["estimate"], 0)]],
+                    yerr=[[max(d["rate"] - d["boot95"][0], 0)], [max(d["boot95"][1] - d["rate"], 0)]], fmt="o",
+                    color=COLORS.get(m, "black"), capsize=2, label=m)
+        ax.annotate(m, (x["estimate"], d["rate"]), textcoords="offset points", xytext=(4, 4), fontsize=7)
+    ax.set_xlabel("mean arrival speed at the drop / v_eff")
+    ax.set_ylabel("departure rate (reactive-feasible)")
+    ax.set_title("caution vs safety (95% CIs)", fontsize=9)
+    ax = axs[1]
+    labels_b = ["<0.8", "0.8–0.9", "0.9–1.0", "≥1.0"]
+    ms = list(ca)
+    w = 0.8 / max(len(ms), 1)
+    for i, m in enumerate(ms):
+        xs, ys, lo, hi = [], [], [], []
+        for j, b in enumerate(ca[m]["bins"]):
+            if b["n_runs"] < 20:  # tiny bins are in the table, not drawn
+                continue
+            xs.append(j + (i - (len(ms) - 1) / 2) * w)
+            ys.append(b["rate"])
+            lo.append(max(b["rate"] - b["wilson95"][0], 0))
+            hi.append(max(b["wilson95"][1] - b["rate"], 0))
+        ax.bar(xs, ys, width=w, color=COLORS.get(m), label=m, yerr=[lo, hi], capsize=1.5, error_kw={"lw": 0.6})
+    ax.set_xticks(range(4))
+    ax.set_xticklabels(labels_b)
+    ax.set_xlabel("arrival speed at the drop / v_eff")
+    ax.set_ylabel("departure rate (Wilson 95%)")
+    ax.set_title("departure at matched arrival speed (bins with >= 20 runs)", fontsize=9)
+    ax.legend(fontsize=7, frameon=False, ncol=2)
+    for ax in axs:
+        ax.spines[["top", "right"]].set_visible(False)
+    fig.suptitle("Exploratory (prereg A7): adaptation or caution?", fontsize=10)
+    fig.tight_layout()
+    fig.savefig(out / "fig_caution.png", dpi=140)
 
 
 def fig_mechanism(root, out, methods=("M-B", "M-L"), t_before=0.5, t_after=3.0):
@@ -289,6 +336,7 @@ def write_tex(res, labels, gen: Path, has):
             ("fig_regime_map.png", "Reactive-feasible departure rate over post-drop surface and effective speed."),
             ("fig_h1.png", "H1: paired departure difference with its 95\\% CI against the $\\pm5$\\,pp margin."),
             ("fig_h2.png", "H2: regret against O-R over each mismatch axis."),
+            ("fig_caution.png", "Exploratory (A7): departure against arrival speed at the drop, per method."),
             ("fig_mechanism.png", "Exploratory: the adaptive planners' friction belief around the drop.")]
     for f, cap in figs:
         if f in has:
@@ -311,7 +359,8 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     labels = load_labels(a.labels.split(","))
     h2n = [n for n in h2_set_names() if (root / n).exists()]
-    res = A.analyze(root, labels, METHODS, h2n or None)
+    veff = {sc.sid: S.v_eff(sc) for f in a.split.split(",") for sc in S.load_jsonl(f)[1]}
+    res = A.analyze(root, labels, METHODS, h2n or None, v_eff=veff)
     (out / "results.json").write_text(json.dumps(res, indent=1))
     (out / "results.md").write_text(A.markdown(res, a.title))
     fig_by_class(res, out)
@@ -319,6 +368,7 @@ def main():
     fig_h1(res, out)
     fig_h2(res, out)
     fig_mechanism(root, out)
+    fig_caution(res, out)
     if a.tex:
         write_tex(res, labels, Path(a.tex), {p.name for p in out.glob("*.png")})
     print((out / "results.md").read_text())

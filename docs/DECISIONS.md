@@ -297,3 +297,39 @@ What A5 adds to V6/V7/EVAL_PROTOCOL and why:
 - **Implementation:** `control/episode.py: run_prefix(strict=False)`, `eval/runner.py: axis_exclusions`. The analysis
   asserts that every level of an axis has the same scenario list. `scripts/eval_split.py` requires A6 in the
   prereg before a test evaluation.
+
+## D32: Separate adaptation from caution with pre-declared exploratory analyses (prereg A7). DECIDED 2026-11-11
+- **Found by:** running the tuned P-T and P-S checkpoints through the evaluation runner on tuning data and adding
+  an arrival-speed column. The policies arrive at ~0.65 × v_eff; O-R arrives at ~1.0 and M-B at ~0.9. They
+  depart less on RF scenarios, and they survive about half of the preview-required/undetermined ones, where every
+  MPPI method fails.
+- **Why it happens:** every episode in the training library and in the benchmark has a friction drop ~4 s after
+  handover. RL learns the prior "a drop is coming". The MPPI cost is the same, but a planner with a dry-road (or
+  current-friction) model sees no reason to slow down.
+- **Options considered:**
+  1. **Retrain the policies with drop-free episodes.** Rejected: tuning is finished, and changing the training
+     distribution now would void the logged budget. The test distribution itself always has a drop, so the
+     prior is not wrong for this benchmark.
+  2. **Change H1 to a speed-adjusted metric.** Rejected: that edits a confirmatory hypothesis after seeing
+     tuning behaviour.
+  3. **Keep H1–H3 and add exploratory, pre-declared analyses (chosen).** E6 measures caution. E7 gives the bank
+     MPPI the same speed, with c fixed from tuning data, and states the interpretation rule in advance.
+- **Note for the write-up:** this is the kind of artefact the benchmark exists to expose. A "RL wins" headline
+  without E6/E7 would be misleading.
+
+## D33: S2 failed on two collapsed PPO seeds; add collapse rollback, retrain all PPO seeds (prereg A8). DECIDED 2026-11-11
+- **Evidence:**
+  - S2 departure was 0.195 pooled; the per-seed values were 0.010 / 0.182 / 0.000 / 0.039 / 0.746.
+  - The logs of seeds 1 and 4 show the known P3 failure mode: success falls to ~0 around iterations 100–130 of
+    381 with exploding returns (−4,700, −9,400), and it never comes back. Target-KL stopping, gradient clipping,
+    LR decay and best-checkpoint selection were all already on.
+- **Options considered:**
+  1. **Drop or replace the bad seeds.** Rejected: that is best-of selection (EVAL_PROTOCOL §3).
+  2. **Go ahead with S2 failed.** Rejected while a cheap, principled fix exists. V5 calls this a training bug.
+  3. **Retune with multi-seed scoring.** Rejected: it would double the RL tuning budget after the fact, and the
+     MPPI arm got no such second round.
+  4. **Collapse rollback (chosen).** A standard divergence guard, applied identically to every PPO run. It never
+     triggers on a healthy run, so tuning results carry over.
+- **Fairness note.** This adds engineering effort to the learned arm after seeing tuning data. The MPPI arm also
+  had bugs fixed after tuning-data runs (e.g. D28). Human-hours are logged, not capped (V2). The trial and
+  GPU-hour budgets are unchanged.

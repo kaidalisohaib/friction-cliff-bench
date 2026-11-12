@@ -1,0 +1,19 @@
+{
+ "method": "P-TP",
+ "best_params": {
+  "lr": 2.4179177243329487e-05,
+  "init_std": 0.10727865205697158,
+  "init_std_long": 0.1289823387561863,
+  "reward_scale": 0.011095983846308636,
+  "gamma": 0.99,
+  "width": 256
+ },
+ "best_value": 0.006652768729641694,
+ "n_trials": 14,
+ "gpu_hours": 3.391127469473415,
+ "stopped_by": "trials",
+ "tag": "P-TP_1794431337",
+ "n_tuning_rf": 307,
+ "git": "929ae5165cfd3c676986e2b4eb15ae3ff15a5a4e",
+ "checkpoint": "runs/tuning/P-TP_1794431337.pt"
+}
