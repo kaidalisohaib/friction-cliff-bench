@@ -45,6 +45,9 @@ Format per entry: date, phase, hours, what was done, and the verdict for any run
 - **Test evaluation launched** 2026-11-11 21:05 (`runs/eval_test/`: main, dry, h2 as three parallel jobs,
   C++ backend). Three jobs give about 3× the throughput of one: each job syncs to the host every control step, so
   one job alone leaves the GPU idle part of the time.
+- **Incident 2 (20:44, 11-12):** another session restart killed the jobs again. systemd stops the terminal session's cgroup
+  scope, and `setsid` cannot escape it. The jobs were relaunched as `systemd-run --user` units (own cgroups). Main
+  was at 41/55; h2 was at delay-5.
 - **Incident:** at about 01:00 on 11-12 the session restart killed all three jobs (nohup was not enough; they shared
   the session's process group). About 1 h of in-progress (method, seed) pairs was lost; completed files are kept by
   design. Relaunched at 01:46 with `setsid`.
