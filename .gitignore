@@ -27,3 +27,4 @@ data/
 paper/*.pdf
 paper/*.aux
 paper/*.log
+data_ext/

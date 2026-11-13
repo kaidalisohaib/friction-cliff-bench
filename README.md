@@ -74,6 +74,9 @@ MPPI_BACKEND=cpp PYTHONPATH=. uv run pytest -q tests/test_mppi_cpp.py   # C++ vs
 The simulated car's steady-state understeer is compared with ten passenger-car platforms from openpilot driving logs
 ([commaSteeringControl](https://huggingface.co/datasets/commaai/commaSteeringControl), MIT). The steering ratio is
 fitted, not assumed. Script, table and figure: [`docs/results/grounding/`](docs/results/grounding/comma_understeer.md).
+The scenario friction levels are compared with road-weather sensor logs from winter drives at Mcity (MARWIS, part
+of [MCity-WSPI](https://huggingface.co/datasets/AD-Assurance-Lab/winter-driving-dataset), CC-BY-4.0):
+[`docs/results/grounding/marwis.md`](docs/results/grounding/marwis.md).
 
 ## Results
 <!-- RESULTS:BEGIN -->

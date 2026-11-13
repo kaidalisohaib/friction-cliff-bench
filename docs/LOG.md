@@ -34,6 +34,27 @@ Format per entry: date, phase, hours, what was done, and the verdict for any run
 
 ## Entries
 
+### 2026-11-13: P5 grounding, friction levels (MARWIS); exploratory E1–E3 launched
+- **MARWIS (MCity-WSPI, CC-BY-4.0):** 24 CSVs downloaded into gitignored `data_ext/wspi_marwis/raw` and verified
+  against SHA-256. They are read with `python -I scripts/wspi_marwis.py` (tested). Results are in
+  `docs/results/grounding/marwis.md`; the report has a "Friction levels" paragraph and a figure.
+  - Labelled Mcity drives give grip relative to dry of snow 0.30 [0.30, 0.35] (2,248 samples, 3 drives) and
+    snow/ice 0.31 [0.30, 0.34] (1,436, 3). Cluster-bootstrap CIs over drives.
+  - The simulator samples snow at 0.20–0.41 of dry and ice at 0.08–0.18. Our snow range covers the Mcity readings;
+    our ice is harsher than any labelled reading.
+  - In the unlabelled Kalamazoo winter logs (1,972 samples, 21 drives), the lowest 1% are below 0.23 of dry.
+  - Caveat: MARWIS is an optical grip proxy. Its value changes every ≈ 10 s, so it cannot check ramp sharpness.
+    The Lufft numeric condition codes are undocumented, so Kalamazoo is used only as an unlabelled distribution.
+  - → **Verdict:** the snow range matches these logs; the ice range is harsher than any labelled reading.
+- **Exploratory E1–E3 (prereg §Exploratory; outside the Holm family):** `scripts/exploratory.py` (tested where new:
+  the action-distillation target in `rl/ppo.py`).
+  - Evaluation set: the pre-declared 500-scenario RF test subset, nominal truth, batch 64, 5 seeds.
+  - E1: W ∈ {0.1, 0.25, 0.5, 1.0} s for M-B, M-L and P-S. Students and estimators are retrained per W with the
+    tuned hyperparameters and nothing new is tuned.
+  - E2: K ∈ {256, 1,024, 4,096} for M-B and M-L.
+  - E3: P-S with DAgger action distillation instead of latent regression.
+  - Run as `systemd-run --user` units `fcb-exp-{train,mb,ml,after}`; logs in `runs/exploratory/`.
+
 ### 2026-11-13 early: confirmatory test evaluation complete; results generated; write-up
 - **Evaluation:**
   - main: 4,000 scenarios × 11 methods × 5 seeds;

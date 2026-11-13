@@ -295,6 +295,7 @@ class DistillConfig:
     total_steps: int = 10_000_000
     batch_steps: int = 8  # env steps accumulated per gradient step
     act_noise: float = 0.0  # exploration noise on the student's actions while collecting
+    target: str = "latent"  # "latent": regress the teacher's z (RMA); "action": match the teacher's actions (E3)
 
 
 class Student(nn.Module):
@@ -317,6 +318,7 @@ def distill(teacher: ActorCritic, lib: dict, cfg: DistillConfig, seed: int = 0, 
     env = FrictionEnv(lib, cfg.n_envs, cfg.hist_len, device, seed=seed + 1000)
     dev = env.dev
     st = Student(teacher, cfg.hidden).to(dev)
+    assert cfg.target in ("latent", "action"), cfg.target
     opt = torch.optim.Adam(st.henc.parameters(), lr=cfg.lr)
     iters = max(1, cfg.total_steps // (cfg.n_envs * cfg.batch_steps))
     hist = {"iter": [], "loss": [], "succ": []}
@@ -330,7 +332,12 @@ def distill(teacher: ActorCritic, lib: dict, cfg: DistillConfig, seed: int = 0, 
             with torch.no_grad():
                 z = teacher.z(pv, pr)
             zh = st.henc(h)
-            loss = loss + ((zh - z) ** 2).mean()
+            if cfg.target == "action":  # E3: DAgger action distillation through the frozen teacher head
+                with torch.no_grad():
+                    a_t = teacher.actor(torch.cat([f, z], 1))
+                loss = loss + ((teacher.actor(torch.cat([f, zh], 1)) - a_t) ** 2).mean()
+            else:
+                loss = loss + ((zh - z) ** 2).mean()
             with torch.no_grad():
                 a = teacher.actor(torch.cat([f, zh.detach()], 1))
                 if cfg.act_noise > 0:

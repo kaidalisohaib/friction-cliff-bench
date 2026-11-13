@@ -21,5 +21,8 @@ PYTHONPATH=. uv run python scripts/make_figures.py --root $ROOT --labels labels/
     --split splits/test_v1_T0.jsonl --out docs/results --tex paper/gen
 PYTHONPATH=. uv run python scripts/compute_tex.py
 PYTHONPATH=. uv run python scripts/readme_results.py
+if [ "$(n runs/eval_test/exploratory jsonl)" -gt 0 ]; then   # exploratory E1-E3 (scripts/exploratory.py)
+    PYTHONPATH=. uv run python scripts/exploratory.py analyze > /dev/null
+fi
 (cd paper && tectonic main.tex)
 echo "done: docs/results/results.md, docs/results/*.png, paper/gen/*.tex, README results block, paper/main.pdf"

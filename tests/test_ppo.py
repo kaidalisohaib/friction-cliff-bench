@@ -8,7 +8,7 @@ from control.estimator import train_estimator
 from eval.methods import run_controller
 from rl import library as Lb
 from rl.policy import policy_controller
-from rl.ppo import DistillConfig, PPOConfig, distill, train_ppo
+from rl.ppo import Student, DistillConfig, PPOConfig, distill, train_ppo
 from scenarios import sampler as S
 from scenarios import track as T
 
@@ -37,6 +37,18 @@ def test_training_loops_run_and_policies_evaluate():
                           lambda sim, sub, ss, seed: policy_controller(sim, sub, st, "student", 5, seed), "P-S", 0,
                           device="cpu")
     assert len(recs) == 3
+
+
+def test_action_distillation_trains_only_the_history_encoder():
+    _, _, lib = _lib(4)
+    teacher, _ = train_ppo("teacher", lib, PPOConfig(n_envs=8, horizon=8, total_steps=64, epochs=1, bc_steps=3), device="cpu",
+                           log=lambda s: None)
+    before = {k: v.clone() for k, v in teacher.state_dict().items()}
+    st, h = distill(teacher, lib, DistillConfig(hist_len=5, n_envs=8, total_steps=8 * 8 * 3, batch_steps=2, lr=1e-2,
+                                                target="action"), device="cpu", log=lambda s: None)
+    assert np.isfinite(h["loss"]).all()
+    assert all(torch.equal(before[k], v) for k, v in teacher.state_dict().items())  # frozen teacher
+    assert isinstance(st, Student) and min(h["loss"]) > 0
 
 
 def test_estimator_training_runs():
