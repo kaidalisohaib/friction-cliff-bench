@@ -9,10 +9,12 @@ And in which scenarios can *nothing* save the car?
 *Tuning scenario, not a result. Orange lines are the planner's sampled plans, simulated with the planner's own
 friction model: the friction-blind planner keeps believing it can turn.*
 
-**Status (Nov 2026):** simulator, feasibility labelling, oracles, adaptive MPPI, RL arm and the C++/CUDA MPPI are
-built and tested. The 4,000-scenario test pool is labelled and frozen
-([class breakdown](docs/figures/labels_test_T0.md)), every method is tuned under the logged budget and trained with
-5 seeds, and the confirmatory test evaluation is running. The protocol was
+**Status (Nov 2026):** complete. The 4,000-scenario test split was labelled and frozen
+([class breakdown](docs/figures/labels_test_T0.md)), every method was tuned under the logged budget and trained with
+5 seeds, and the confirmatory evaluation is done: see [Results](#results) and the
+[technical report](paper/main.tex) (`cd paper && tectonic main.tex`). **In short:** under matched information and
+budget, the RMA student did not beat the bank-adaptive MPPI. Its five training seeds ranged from excellent to failing,
+and much of the apparent robustness to a friction drop comes from slowing down early. The protocol was
 [pre-registered](docs/PREREGISTRATION.md) (`prereg-v1`) before any test scenario was labelled or evaluated; later
 changes are dated amendments.
 
@@ -75,8 +77,31 @@ fitted, not assumed. Script, table and figure: [`docs/results/grounding/`](docs/
 
 ## Results
 <!-- RESULTS:BEGIN -->
-Pending: the confirmatory test evaluation is running. This block is generated from the harness output by
-`scripts/readme_results.py`.
+Confirmatory test split: 4,000 scenarios, 3,009 of them reactive-feasible, 5 seeds per method. Intervals are 95% hierarchical-bootstrap CIs over scenarios and seeds. Full tables: [`docs/results/results.md`](docs/results/results.md).
+
+> **Caveat (gate S2 failed, amendment A8).** The final PPO teacher departed on 0.197 of N = 1,535 reactive-feasible *tuning* runs (Wilson 95% [0.178, 0.218]) vs 0.037 for the oracle. The cause is seed-to-seed instability, so per-seed results are reported and no seed was dropped.
+
+| method | | departure on reactive-feasible scenarios [95% CI] |
+|---|---|---|
+| O-R | oracle, knows current friction | 0.044 [0.037, 0.050] |
+| O-C | oracle, sees the road ahead | 0.001 [0.000, 0.003] |
+| M-N | MPPI, assumes dry road | 0.094 [0.084, 0.104] |
+| M-B | adaptive MPPI, model bank | 0.034 [0.028, 0.040] |
+| M-L | adaptive MPPI, learned estimator | 0.078 [0.069, 0.089] |
+| M-B-c | M-B at the student's arrival speed (exploratory, A7) | 0.006 [0.003, 0.008] |
+| P-T | PPO teacher (sees friction) | 0.199 [0.031, 0.470] |
+| P-TP | PPO teacher with road preview | 0.022 [0.010, 0.035] |
+| P-DR | domain-randomized PPO | 0.139 [0.070, 0.186] |
+| P-S | RMA student (history only) | 0.190 [0.024, 0.451] |
+| P-SP | student of the preview teacher | 0.012 [0.003, 0.023] |
+
+- **H1** (prediction: the RMA student does *not* depart less than the better adaptive MPPI by more than 5 pp): departure(M-B) − departure(P-S) = -15.6 pp [-42.1, +1.0]; not falsified. TOST ±5 pp: equivalence not shown.
+  The interval is wide because the student's five training seeds depart between 0.003 and 0.710; the worst seed departs on 0.656 of dry-road runs without any friction drop, so its failures are mostly lane keeping, not adaptation. Per-seed tables: `docs/results/results.md`.
+- **H2** (prediction: under model mismatch the adaptive MPPI's regret grows faster than the student's, and the curves cross): 0 of 3 axes pass; not supported.
+- **H3** (prediction: the student of the current-friction teacher matches or beats the preview-teacher student): departure(P-S) − departure(P-SP) = +17.7 pp [+1.2, +44.3], P-SP's dry-progress loss vs P-S = -5.5% [-17.6, 4.1]; not falsified (the falsifier needs lower departure *and* an upper CI bound of the dry-progress loss below 2%).
+- Holm–Bonferroni over the three pre-registered tests (α = 0.05): none significant. p = H1 1.000, H3 0.075, H2 1.000.
+- **Adaptation or caution?** (exploratory, rule fixed in A7 before the test run) The bank MPPI driven at the student's arrival speed departs 0.006 vs P-S 0.190; difference -18.4 pp [-45.2, -1.9], so no student advantage to explain. Slowing down has a price: M-B-c loses 16.0% [15.4, 16.7] of dry-road progress against O-R, M-B 4.2% [4.0, 4.5].
+- **Compute** (NVIDIA GeForce RTX 5090 Laptop GPU, median of N = 30): one MPPI control step (K = 1,024 samples, H = 150) takes 15.3 ms in C++/CUDA vs 15.8 ms in Warp. For 64 cars at once: 46.8 vs 58.9 ms. Details: [`docs/results/compute_benchmarks.md`](docs/results/compute_benchmarks.md).
 <!-- RESULTS:END -->
 
 ## Limitations (by design)

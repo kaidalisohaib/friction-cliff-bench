@@ -355,6 +355,9 @@ def analyze(root: Path, labels: dict, methods, h2_names: list[str] | None = None
     # per-seed reactive-feasible departure (all seeds reported, never best-of; A8: S2 failed on seed instability)
     res["per_seed_rf_departure"] = {m: [float(x) for x in np.nanmean(mat(main, m, "departed", rf_cols), axis=1)]
                                     for m in methods if m in main}
+    if dry:  # diagnostic: the same per-seed rate on the dry set (no drop): lane keeping without any friction change
+        res["per_seed_dry_departure"] = {m: [float(x) for x in np.nanmean(mat(dry, m, "departed"), axis=1)]
+                                         for m in methods if m in dry}
     if v_eff is not None:  # exploratory E6 (A7)
         ve = np.array([v_eff[sids[j]] for j in rf_cols])
         res["exploratory_caution_rf"] = caution(main, rf_cols, ve, methods)
@@ -433,6 +436,11 @@ def markdown(res: dict, title: str) -> str:
     if res.get("per_seed_rf_departure"):
         L += ["", "## Per-seed departure (reactive-feasible; seed 0..4)", "", "| method | per seed |", "|---|---|"]
         for m, v in res["per_seed_rf_departure"].items():
+            L.append(f"| {m} | {', '.join(f'{x:.3f}' for x in v)} |")
+    if res.get("per_seed_dry_departure"):
+        L += ["", "## Per-seed departure on the dry set (no friction drop; diagnostic)", "", "| method | per seed |",
+              "|---|---|"]
+        for m, v in res["per_seed_dry_departure"].items():
             L.append(f"| {m} | {', '.join(f'{x:.3f}' for x in v)} |")
     if res.get("exploratory_caution_rf"):
         L += ["", "## Exploratory E6 (A7): arrival speed at the drop (reactive-feasible)", "",

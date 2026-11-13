@@ -70,8 +70,8 @@ def fig_regime_map(root, labels, split_files, out):
     surf = ["wet", "snow", "ice"]
     bands = [(0, 12), (12, 17), (17, 22), (22, 99)]
     ms = [m for m in METHODS if m in main]
-    fig, axs = plt.subplots(1, len(ms), figsize=(2.1 * len(ms), 2.9), sharey=True)
-    for ax, m in zip(np.atleast_1d(axs), ms):
+    grids = {}
+    for m in ms:
         dep = A.mat(main, m, "departed").mean(axis=0)
         grid = np.full((len(surf), len(bands)), np.nan)
         cnt = np.zeros_like(grid)
@@ -82,18 +82,27 @@ def fig_regime_map(root, labels, split_files, out):
             si = surf.index(sc.surface)
             grid[si, b] = np.nansum([grid[si, b], dep[j]])
             cnt[si, b] += 1
-        grid = np.where(cnt > 0, grid / np.maximum(cnt, 1), np.nan)
-        ax.imshow(grid, vmin=0, vmax=max(0.3, np.nanmax(grid) if np.isfinite(grid).any() else 0.3), cmap="Reds")
+        grids[m] = (np.where(cnt > 0, grid / np.maximum(cnt, 1), np.nan), cnt)
+    vmax = max([0.3] + [float(np.nanmax(g)) for g, _ in grids.values() if np.isfinite(g).any()])
+    ncol = min(6, len(ms))
+    nrow = int(np.ceil(len(ms) / ncol))
+    fig, axs = plt.subplots(nrow, ncol, figsize=(2.3 * ncol, 2.3 * nrow + 0.5), squeeze=False)
+    for ax in axs.flat[len(ms):]:
+        ax.axis("off")
+    for ax, m in zip(axs.flat, ms):
+        grid, cnt = grids[m]
+        ax.imshow(grid, vmin=0, vmax=vmax, cmap="Reds")
         for (i, k), v in np.ndenumerate(grid):
             if np.isfinite(v):
-                ax.text(k, i, f"{v:.2f}\n{int(cnt[i, k])}", ha="center", va="center", fontsize=6)
+                ax.text(k, i, f"{v:.2f}\n{int(cnt[i, k])}", ha="center", va="center", fontsize=6,
+                        color="white" if v > 0.6 * vmax else "black")
         ax.set_title(m, fontsize=9)
         ax.set_xticks(range(len(bands)))
         ax.set_xticklabels(["≤12", "12–17", "17–22", ">22"], fontsize=6)
         ax.set_yticks(range(len(surf)))
         ax.set_yticklabels(surf, fontsize=7)
-    fig.suptitle("Reactive-feasible departure rate by post-drop surface × v_eff [m/s] (cell: rate, N scenarios)",
-                 fontsize=9)
+    fig.suptitle("Reactive-feasible departure rate by post-drop surface × v_eff [m/s] (cell: rate, N scenarios; "
+                 f"one colour scale, 0 to {vmax:.2f})", fontsize=9)
     fig.tight_layout()
     fig.savefig(out / "fig_regime_map.png", dpi=140)
 
@@ -259,6 +268,10 @@ def pct(x):
     return f"{100 * x:+.1f}"
 
 
+def relpct(e):
+    return f"{100 * e['estimate']:.1f}\\% [{100 * e['ci95'][0]:.1f}, {100 * e['ci95'][1]:.1f}]"
+
+
 def ci_pp(e):
     return f"{pct(e['estimate'])}\\,pp [{pct(e['ci95'][0])}, {pct(e['ci95'][1])}]"
 
@@ -289,11 +302,15 @@ def s2_tex(res, s2_path=Path("ledgers/s2_gate_A8.json")) -> list[str]:
             L.append("\\begin{table}[t]\\centering\\small\\begin{tabular}{@{}l" + "c" * len(ps[rows[0]]) +
                      "@{}}\\toprule method & " + " & ".join(f"seed {i}" for i in range(len(ps[rows[0]]))) +
                      "\\\\\\midrule")
+            dry = res.get("per_seed_dry_departure", {})
             for m in rows:
                 L.append(f"{m} & " + " & ".join(f"{x:.3f}" for x in ps[m]) + "\\\\")
-            L.append("\\bottomrule\\end{tabular}\\caption{Reactive-feasible test departure per training seed "
-                     "(each seed is one trained policy or estimator, evaluated over all reactive-feasible "
-                     "scenarios).}\\label{tab:seeds}\\end{table}\n")
+                if m in dry:
+                    L.append("\\quad dry set & " + " & ".join(f"{x:.3f}" for x in dry[m]) + "\\\\")
+            L.append("\\bottomrule\\end{tabular}\\caption{Departure per training seed on the reactive-feasible "
+                     "test scenarios and, below each method, on the dry set (the same kind of scenarios with the "
+                     "friction drop removed). Each seed is one trained policy or estimator.}\\label{tab:seeds}"
+                     "\\end{table}\n")
     return L
 
 
@@ -430,8 +447,22 @@ def write_tex(res, labels, gen: Path, has):
     for f, cap in figs:
         if f in has:
             L.append(f"\\begin{{figure}}[t]\\centering\\includegraphics[width=\\linewidth]{{{f}}}"
-                     f"\\caption{{{cap}}}\\end{{figure}}\n")
+                     f"\\caption{{{cap}}}\\label{{fig:{f[:-4]}}}\\end{{figure}}\n")
     (gen / "results.tex").write_text("\n".join(L))
+    ps = res.get("per_seed_rf_departure", {}).get("P-S")
+    if ps:
+        A.append(f"The student's five training seeds depart on {min(ps):.3f} to {max(ps):.3f} of reactive-feasible "
+                 "runs, so its reliability across seeds, not its best case, decides the comparison.")
+    if "H3" in hyp:
+        h = hyp["H3"]
+        A.append(f"Distilling from a teacher with road preview lowers the student's departure by "
+                 f"{ci_pp(h['diff_PS_minus_PSP'])}, but the pre-registered dry-pace bound is not met, so H3 is "
+                 f"{'falsified' if h['falsified'] else 'not falsified'}.")
+    e, sec = res.get("exploratory_e7"), res.get("secondary_rf", {})
+    if e and all(m in sec and "dry_pace_tax" in sec[m] for m in ("M-B", "M-B-c")):
+        A.append(f"Exploratory: the bank MPPI driven at the student's lower arrival speed departs on {e['dep_MBc']:.3f} "
+                 f"of reactive-feasible runs, at a dry-road pace cost of {relpct(sec['M-B-c']['dry_pace_tax'])} "
+                 f"against {relpct(sec['M-B']['dry_pace_tax'])} for M-B.")
     (gen / "abstract_results.tex").write_text(" ".join(A) + "\n")
 
 

@@ -34,6 +34,31 @@ Format per entry: date, phase, hours, what was done, and the verdict for any run
 
 ## Entries
 
+### 2026-11-13 early: confirmatory test evaluation complete; results generated; write-up
+- **Evaluation:**
+  - main: 4,000 scenarios × 11 methods × 5 seeds;
+  - dry and H2: 9 levels on the 500-scenario subset (delay axis 486 after A6);
+  - trace pass (exploratory).
+  - C++ backend, batch 64. Units ran as `systemd-run --user` services after the second restart incident.
+  - `scripts/finalize.sh` → `docs/results/`, `paper/gen/`, README block, PDF.
+- **Verdicts (prediction → result; numbers from `docs/results/results.md`, 3,009 RF scenarios × 5 seeds):**
+  - **H1** (RL does not win by > 5 pp): not falsified. Departure(M-B) − departure(P-S) = -15.6 pp [-42.1, +1.0];
+    equivalence not shown. The point estimate favours M-B. The CI is wide because P-S seeds range widely (seed 4
+    also departs on most dry-set runs: lane keeping, not adaptation). → **as predicted.**
+  - **H2** (MPPI regret grows faster under mismatch): 0/3 axes; not supported. The bank MPPI's regret stays near or
+    below O-R. → **prediction wrong.**
+  - **H3** (P-S matches P-SP): not falsified. P-SP departs less (+17.7 pp [+1.2, +44.3]), but the dry-pace
+    bound is not met with confidence. → **partly wrong:** the preview teacher's student is clearly better on
+    departure.
+  - **Holm:** none significant.
+  - **E7:** no student advantage to attribute. M-B-c departs 0.006 vs P-S 0.190
+    (difference -18.4 pp [-45.2, -1.9]), at about 4× M-B's dry pace tax. → caution is a strong lever, with
+    a price.
+- **Consistency check:** per-seed P-T departure on test matches S2 on tuning seed for seed, so there is no
+  train/test pipeline drift.
+- **Added before writing:** a per-seed dry-set departure diagnostic (harness, tested); a two-row regime map with
+  one colour scale; generated README/abstract wording with CIs on every number.
+
 ### 2026-11-12 night: confirmatory test evaluation launched; D34; compute benchmark; engineering
 - **Compute benchmark** (`docs/results/compute_benchmarks.*`, N = 30, idle GPU) committed after a label fix. The
   simulator table printed the repetition count instead of the number of cars; the rates themselves were right.

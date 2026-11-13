@@ -205,6 +205,46 @@ compiler-dependent fused multiply-add placement, so confirmatory runs use one ba
 \section{Results}\label{sec:results}
 \IfGen{gen/results.tex}{confirmatory results H1--H3 with N and 95\% CIs; per-class departure; regime map; mechanism}
 
+\section{Discussion}\label{sec:discussion}
+\textbf{No learned win under parity.} The pre-registered falsifier of H1 is not met: with the same observations,
+the same objective and the same logged tuning budget, the RMA student does not depart less than the bank-adaptive
+MPPI. The point estimate favours the MPPI, but equivalence is not shown either, because the interval is wide. This
+does not mean ``MPC beats RL''. It means that under parity the claim that a learned policy adapts better does not
+survive, and the protocol could have shown the opposite.
+
+\textbf{Seed reliability is the result.} The interval is wide because training seeds of one configuration produce
+very different policies (Table~\ref{tab:seeds}). The best student seed departs less than every MPPI without preview. The worst also
+leaves the lane on dry road, where no adaptation is needed. Its teacher's seeds rank in the same order, so the
+student inherits the teacher's quality. Gate S2 flagged this on tuning data before any test run, and the test split reproduced it seed for
+seed. A benchmark that reported one seed, or the best one, could have reached either conclusion.
+
+\textbf{Caution is the strongest single lever.} The trained policies reach the drop well below the reference speed
+(E6, Figure~\ref{fig:fig_caution}). Driving the bank MPPI at the student's arrival speed (M-B-c) gives one of the lowest departure rates of any
+non-clairvoyant method, at several times the bank MPPI's dry-road pace cost. A7's rule for attributing a student
+advantage to caution never applies, because there is no student advantage. But the trade-off it measures is real:
+much of what looks like robustness to a friction drop can be bought by slowing down, and the dry pace tax prices it.
+
+\textbf{A preview teacher helps a blind student.} The student distilled from a teacher that saw the road ahead
+departs less than the student of the current-friction teacher, with an interval that excludes zero. It is also far
+more consistent across seeds. It never sees the road ahead itself. H3 is still not falsified, because the
+pre-registered bound on its dry-pace loss is not met with confidence. Why the preview teacher helps is not tested
+here. A plausible reading is that it learns smoother, more anticipatory driving, which its student can imitate from
+history alone.
+
+\textbf{Mismatch did not hurt the bank MPPI.} Across all three mismatch axes, the bank MPPI's regret against the
+reactive oracle stays near or below zero, while the student's stays high and flat (Figure~\ref{fig:fig_h2}). H2 is not
+supported on any axis. The prediction that model-based adaptation degrades faster outside its model family did not
+hold for the mismatch sizes tested.
+
+\textbf{Labels change the ranking.} On preview-required and undetermined scenarios, the ordering inverts: the
+reactive MPPIs nearly always depart, while the cautious policies and M-B-c sometimes survive. That is what the
+labels predict. A controller that only reacts cannot win there, and slowing down early is a form of preview. A
+single pooled departure rate over all scenarios would mostly measure how many such scenarios the sampler produced.
+
+\textbf{Mechanism (exploratory).} The bank MPPI's friction belief catches the drop within a fraction of a second.
+The learned estimator overestimates friction for more than a second after it (Figure~\ref{fig:fig_mechanism}), which is
+consistent with its higher departure rate.
+
 \section{Grounding against real driving data}\label{sec:grounding}
 The simulator's steady-state cornering response is compared with openpilot-engaged driving of ten passenger-car
 platforms in the commaSteeringControl dataset~\citep{comma}. The understeer gradient is fitted with the steering
@@ -215,7 +255,12 @@ ratio left free, so only the wheelbase is taken from the car specifications.
 Simulation only: a planar single-track model without roll or lateral load transfer, one vehicle, friction that
 changes along the lane only, and labels that hold for this model. The oracles are strong but finite witnesses, so the
 undetermined class is reported separately. All training, tuning and evaluation run on a single laptop GPU, which
-bounds the scenario counts and the number of training seeds.
+bounds the scenario counts and the number of training seeds. PPO training is unstable across seeds in this task even with
+the stabilisers and the collapse rollback (A8). The learned arm is therefore one tuned configuration with five
+seeds, not the best a larger search or more seeds could reach, and gate S2 failed. Every method was tuned once,
+under the same trial and GPU-hour budget, so a stronger RL recipe could change H1. The H2 mismatch axes cover three
+model errors at four levels each on a 500-scenario subset. The recovery-latency and mechanism analyses use a
+separate trace pass and are exploratory.
 
 \bibliographystyle{plainnat}
 \bibliography{refs}

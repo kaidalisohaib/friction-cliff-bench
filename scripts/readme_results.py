@@ -22,6 +22,10 @@ DESC = {"O-R": "oracle, knows current friction", "O-C": "oracle, sees the road a
         "P-SP": "student of the preview teacher"}
 
 
+def rel(e: dict) -> str:
+    return f"{100 * e['estimate']:.1f}% [{100 * e['ci95'][0]:.1f}, {100 * e['ci95'][1]:.1f}]"
+
+
 def pp(e: dict) -> str:
     return f"{100 * e['estimate']:+.1f} pp [{100 * e['ci95'][0]:+.1f}, {100 * e['ci95'][1]:+.1f}]"
 
@@ -55,6 +59,17 @@ def render(res: dict, s2: dict | None, comp: dict | None) -> str:
                  f"{h['better_mppi']}) − departure(P-S) = {pp(h['diff_best_minus_PS'])}; "
                  f"{'falsified' if h['falsified'] else 'not falsified'}. TOST ±5 pp: "
                  f"{'equivalent' if h['tost']['equivalent'] else 'equivalence not shown'}.")
+        ps = res.get("per_seed_rf_departure", {}).get("P-S")
+        if ps:
+            line = (f"  The interval is wide because the student's five training seeds depart between {min(ps):.3f} and "
+                    f"{max(ps):.3f}")
+            dry = res.get("per_seed_dry_departure", {}).get("P-S")
+            if dry:
+                k = max(range(len(ps)), key=lambda i: ps[i])
+                line += (f"; the worst seed departs on {dry[k]:.3f} of dry-road runs without any friction drop"
+                         + (", so its failures are mostly lane keeping, not adaptation" if dry[k] >= 0.5 * ps[k]
+                            else ", so most of its failures follow the drop"))
+            L.append(line + ". Per-seed tables: `docs/results/results.md`.")
     if "H2" in hyp:
         h = hyp["H2"]
         L.append(f"- **H2** (prediction: under model mismatch the adaptive MPPI's regret grows faster than the student's, and the curves cross): "
@@ -62,11 +77,18 @@ def render(res: dict, s2: dict | None, comp: dict | None) -> str:
     if "H3" in hyp:
         h = hyp["H3"]
         L.append(f"- **H3** (prediction: the student of the current-friction teacher matches or beats the preview-teacher student): departure(P-S) − "
-                 f"departure(P-SP) = {pp(h['diff_PS_minus_PSP'])}; {'falsified' if h['falsified'] else 'not falsified'}.")
+                 f"departure(P-SP) = {pp(h['diff_PS_minus_PSP'])}"
+                 + (f", P-SP's dry-progress loss vs P-S = {rel(h['dry_progress_loss_PSP_vs_PS'])}"
+                    if "dry_progress_loss_PSP_vs_PS" in h else "")
+                 + f"; {'falsified' if h['falsified'] else 'not falsified'} (the falsifier needs lower departure "
+                 "*and* an upper CI bound of the dry-progress loss below 2%).")
     if "holm" in res:
-        L.append("- Holm over {" + ", ".join(res["holm"]["p"]) + "}: " + ", ".join(
-            f"{k} {'rejected' if v else 'not rejected'}" for k, v in res["holm"]["rejected"].items()) + ".")
+        rej = [k for k, v in res["holm"]["rejected"].items() if v]
+        L.append("- Holm–Bonferroni over the three pre-registered tests (α = 0.05): "
+                 + (", ".join(rej) + " significant." if rej else "none significant.")
+                 + " p = " + ", ".join(f"{k} {p:.3f}" for k, p in res["holm"]["p"].items()) + ".")
     e = res.get("exploratory_e7")
+    sec = res.get("secondary_rf", {})
     if e:
         verdict = ("no student advantage to explain" if not e["student_advantage_in_H1"] else
                    "the student's advantage is attributed to **caution** (arriving slower), not adaptation"
@@ -74,7 +96,10 @@ def render(res: dict, s2: dict | None, comp: dict | None) -> str:
                    "the student's advantage is **not** explained by its lower arrival speed alone")
         L.append(f"- **Adaptation or caution?** (exploratory, rule fixed in A7 before the test run) The bank MPPI "
                  f"driven at the student's arrival speed departs {e['dep_MBc']:.3f} vs P-S {e['dep_PS']:.3f}; "
-                 f"difference {pp(e['diff_MBc_minus_PS'])}, so {verdict}.")
+                 f"difference {pp(e['diff_MBc_minus_PS'])}, so {verdict}."
+                 + (f" Slowing down has a price: M-B-c loses {rel(sec['M-B-c']['dry_pace_tax'])} of dry-road progress "
+                    f"against O-R, M-B {rel(sec['M-B']['dry_pace_tax'])}."
+                    if all(m in sec and "dry_pace_tax" in sec[m] for m in ("M-B-c", "M-B")) else ""))
     if comp:
         lat = {(r["mode"], r["K"], r["H"], r["backend"]): r for r in comp["latency_1car"]}
         w, c = lat[("fixed", 1024, 150, "warp")], lat[("fixed", 1024, 150, "cpp")]

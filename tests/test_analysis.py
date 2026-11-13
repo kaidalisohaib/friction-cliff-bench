@@ -134,7 +134,10 @@ def test_e7_dry_pace_tax_difference(tmp_path):
         _write(tmp_path, "main", m, 0.05, n=100, rng=rng)
     for m, prog in (("O-R", 100.0), ("M-B", 100.0), ("P-S", 90.0), ("M-B-c", 80.0)):
         _write(tmp_path, "dry", m, 0.0, n=100, progress=prog, rng=rng)
-    e = A.analyze(tmp_path, labels, ["O-R", "M-B", "P-S", "M-B-c"])["exploratory_e7"]
+    res = A.analyze(tmp_path, labels, ["O-R", "M-B", "P-S", "M-B-c"])
+    assert set(res["per_seed_dry_departure"]) == {"O-R", "M-B", "P-S", "M-B-c"}
+    assert all(len(v) == 5 and max(v) == 0.0 for v in res["per_seed_dry_departure"].values())
+    e = res["exploratory_e7"]
     t = e["dry_pace_tax_diff_MBc_minus_PS"]  # tax 0.2 - 0.1 = +0.1 (up to the 1% progress jitter)
     assert abs(t["estimate"] - 0.1) < 0.01 and t["ci95"][0] > 0.08
 
