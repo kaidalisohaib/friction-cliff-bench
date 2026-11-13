@@ -298,6 +298,10 @@ def write_tex(out: dict, path: Path) -> None:
         parts.append(f"E3: DAgger action distillation departs {_fmt(r['departure'])} (per seed "
                      f"{', '.join(f'{x:.3f}' for x in r['per_seed'])}); difference to latent regression "
                      f"{_pp(D['P-S-act - P-S_W12'])}.".replace(" pp", "\\,pp"))
+        parts.append(" The student variants share their teachers' seeds, but the bootstrap resamples seeds independently "
+                     "per variant, so the student intervals are conservative. Seed by seed, the pattern repeats: in every "
+                     "student variant the same teacher seed gives the worst student and the same two give the best (table in "
+                     "\\texttt{docs/results/exploratory.md}).")
     txt = "".join(parts) + "\n\n\\begin{figure}[t]\\centering\\includegraphics[width=\\linewidth]{fig_exploratory.png}" \
         "\\caption{Exploratory E1--E3 on the reactive-feasible test subset.}\\label{fig:fig_exploratory}\\end{figure}\n"
     path.write_text(txt.replace("_", "\\_").replace("\\_exploratory", "_exploratory")

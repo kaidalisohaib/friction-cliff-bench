@@ -247,6 +247,11 @@ single pooled departure rate over all scenarios would mostly measure how many su
 The learned estimator overestimates friction for more than a second after it (Figure~\ref{fig:fig_mechanism}), which is
 consistent with its higher departure rate.
 
+\textbf{Exploratory sweeps.} A larger sample budget makes the bank MPPI safer, so its result is partly bought
+with compute. Longer history windows slightly hurt both MPPIs. Neither the student's history window nor its
+distillation target changes its seed-to-seed spread: in every variant the same teacher seeds give the best and the
+worst students, which points at teacher training, not distillation, as the source of the instability.
+
 \section{Grounding against real driving data}\label{sec:grounding}
 The simulator's steady-state cornering response is compared with openpilot-engaged driving of ten passenger-car
 platforms in the commaSteeringControl dataset~\citep{comma}. The understeer gradient is fitted with the steering

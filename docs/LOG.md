@@ -34,6 +34,28 @@ Format per entry: date, phase, hours, what was done, and the verdict for any run
 
 ## Entries
 
+### 2026-11-13 08:15: exploratory E1–E3 done
+- **Coverage:** 17 variants × 5 seeds × 500 RF test scenarios, all complete at 08:13. Outputs:
+  - `docs/results/exploratory.{md,json}`;
+  - `docs/results/fig_exploratory.png`;
+  - `paper/gen/exploratory.tex`, a Results paragraph and a Discussion paragraph.
+  - Paired differences are against the tuned setting.
+- **E2, sample budget:**
+  - M-B at K = 4,096 departs 0.020 [0.009, 0.032], −1.3 pp [−2.4, −0.3] vs K = 1,024. At K = 256: +2.9 pp [+1.4, +4.5].
+  - M-L is flat in K.
+  - → The bank MPPI's result is partly bought with compute.
+- **E1, history window:**
+  - M-B: +1.7 pp [+0.2, +3.2] at 1 s vs 0.1 s.
+  - M-L: +2.0 pp [+0.2, +3.9] at 1 s.
+  - The P-S windows change nothing measurable.
+- **E3, action distillation:** 0.173 [0.023, 0.404] vs 0.190 for latent regression. The seed pattern is unchanged.
+- **Student seeds:** in every student variant, the same teacher seed gives the worst student and the same two give
+  the best. → The instability comes from teacher training, not distillation.
+- **Caveat:** student variants share teacher seeds, but the bootstrap resamples seeds independently, so the student
+  CIs are conservative. Noted in the generated text.
+- Drafted a follow-up: RL vs MPPI at matched pace on a fresh test pool.
+- Tests: 175 passed.
+
 ### 2026-11-13: P5 grounding, friction levels (MARWIS); exploratory E1–E3 launched
 - **MARWIS (MCity-WSPI, CC-BY-4.0):** 24 CSVs downloaded into gitignored `data_ext/wspi_marwis/raw` and verified
   against SHA-256. They are read with `python -I scripts/wspi_marwis.py` (tested). Results are in
