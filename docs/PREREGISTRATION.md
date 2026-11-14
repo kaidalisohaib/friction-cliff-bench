@@ -339,3 +339,58 @@ No method has been run on any test scenario.
   `runs/final_v1_prefix_A8/` with their S2 numbers (LOG). c for E7 is recomputed from the new P-S seeds.
 - **If S2 still fails after A8:** the policy class is reported as failing S2, and H1–H3 are run and reported with
   that caveat, not withheld.
+
+### A9 (2026-11-14): RL follow-up on test pool v2 (D35, D36)
+Written and committed **before** test pool v2 is labelled or any method runs on it. This commit is tagged
+`prereg-v2`. Test v1 results (H1–H3, E1–E7) are unchanged and not re-analysed.
+- **Why.** On v1 the RL student's result depended on the training seed (S2 failed, A8). A diagnosis on training,
+  tuning and dev data only (LOG 2026-11-13/14) found two causes:
+  1. Training kept the best checkpoint by *stochastic* training success, but evaluation uses the mean action. A
+     kept checkpoint can be noise-robust yet fail deterministically.
+  2. Some current-friction-teacher seeds learn poor lane keeping.
+  - Fix: select checkpoints by deterministic success on a held-out validation library.
+  - With it, the preview-teacher student was reliable on all 10 dev seeds.
+- **Test pool v2** = the pre-declared V7 top-up blocks `test_v1_T1/T2/T3` (A2 hashes; never labelled or evaluated).
+  - Labelled with the frozen A4 oracles (`scripts/label_split.py`, 5 seeds), RF scenarios only.
+  - `main` (nominal truth) and `dry` (drop removed, for the pace tax) sets; batch 64; C++ MPPI backend.
+  - Runner: `scripts/eval_v2.py`. Analysis: `eval/followup.py` (tested; committed with this amendment).
+- **Frozen inputs** (`ledgers/A9_frozen.json`, SHA-256 of every checkpoint and data file; `eval_v2.py` refuses to
+  run on any mismatch):
+  - **P-SP2** (the follow-up recipe), 10 seeds:
+    - teacher P-TP at its tuned A8 configuration plus deterministic validation every 10 iterations and
+      checkpoint selection on it (`val_every=10`, `select_on_val`; validation library `runs/rl/lib_val_v1.npz`,
+      2,048 scenarios, new seed, nominal parameters);
+    - student distilled with the tuned P-SP configuration (`scripts/rl_distill.py`).
+  - **P-S2**: the same, from the P-T teacher (10 seeds).
+  - **P-S**: the A8 recipe, 10 seeds.
+    - Seeds 0–4 are the confirmatory checkpoints.
+    - Seeds 5–9 were trained during the follow-up by the same code and configuration (training is
+      deterministic per seed: seeds 0–4 reproduce bit for bit).
+  - **P-SP**: A8, 5 seeds.
+  - **O-R and M-B**: as A4/A5, 5 seeds.
+  - **M-Bc**: M-B with v_ref × c'. c' is interpolated on the **dev split** from the M-B@c pace-tax curve at
+    P-SP2's mean dev pace tax (`scripts/freeze_A9.py`); 5 seeds.
+- **H4 (the one confirmatory test).** P-SP2 is not worse than the bank MPPI at matched pace.
+  - Test: departure(P-SP2) − departure(M-Bc) on v2 RF, upper 95% hierarchical-bootstrap bound < +2 pp.
+  - Margin: 2 pp is under half the H1 equivalence margin (5 pp) and about M-B's own departure at full speed on
+    dev.
+  - Pace match: |dry pace tax difference| ≤ 3 pp (point estimate); otherwise H4 is "pace not matched" and not
+    interpreted.
+  - Superiority (upper bound < 0) is reported as secondary.
+  - **Prediction: non-inferior; not superior.**
+- **H5 (seed reliability, a rule, no p-value).** Gate S2 (V5: departure ≤ O-R + 5 pp, point estimate) applied to
+  each seed separately. It holds if all 10 P-SP2 seeds pass. It is reported for every learned method.
+  - **Prediction: holds for P-SP2; fails for at least one P-S seed.**
+- **Exploratory, pre-declared:**
+  - P-S − P-S2 (the selection fix on the current-friction student). Prediction: lower departure, but the interval
+    may include 0, because one P-S2 dev seed still has poor lane keeping;
+  - P-S − P-SP2 and P-SP − P-SP2;
+  - the P-SP2 seeds of the five best teachers by validation success (`P-SP2_top5_by_validation` in the ledger);
+  - per-seed tables;
+  - learned-policy latency (`scripts/bench_policy.py`) next to the MPPI latency table.
+- **Data use.** Dev split (`splits/dev_v1.jsonl`, new seed, 737 RF, labelled with the frozen oracles) and tuning:
+  recipe choices and c'. Test v1: no decisions. Test v2: this evaluation only.
+- **Parity.** The RL arm's extra engineering (diagnosis runs, about 15 GPU-h) is logged in LOG. The MPPI arm's
+  extra degree of freedom is c', set on dev. H4 is a matched-pace comparison, so neither arm gains from caution
+  alone.
+- **All seeds reported**; no seed dropped.

@@ -361,3 +361,20 @@ What A5 adds to V6/V7/EVAL_PROTOCOL and why:
   - a new claim needs amendment A9: hypotheses, recipe, comparator and a fresh test pool (v2). A9 is committed
     before any v2 evaluation; it is tagged `prereg-v2`.
 - **Parity:** extra engineering on the RL arm is logged. The MPPI arm gets the matching extra budget under A9.
+
+## D36: The follow-up claims are non-inferiority at matched pace (H4) and per-seed reliability (H5), not "RL beats MPPI" (prereg A9). DECIDED 2026-11-14
+- **Dev evidence** (LOG; engineering numbers):
+  - The fixed preview-teacher student P-SP2 is reliable on all 10 seeds.
+  - At matched dry pace it departs about as often as M-B@c' (slightly more, within noise). It does not depart
+    less.
+  - A superiority hypothesis would be predicted to fail. Non-inferiority at matched pace, plus reliability, is
+    what the dev data support and what the actual question ("is the learned policy as good?") needs.
+- **Options considered:**
+  1. **"Fix works" as mean departure, P-S vs P-S2.** Rejected as confirmatory: the A8 recipe's seed distribution
+     is heavy-tailed (one catastrophic seed in five or ten), so a mean-difference interval over 10 seeds is
+     expected to include 0 even when the worst seed is removed. Kept as exploratory.
+  2. **Seed selection (top-5 by validation) as the recipe.** Rejected as primary (selection favours the slowest
+     seeds); kept as exploratory.
+  3. **Non-inferiority (2 pp) + per-seed S2 gate (chosen).**
+- **Why test v2 = T1–T3:** pre-declared and hash-frozen on 2026-11-08, before any method existed, and never
+  labelled. That is a fresher test set than any new sample drawn now.
