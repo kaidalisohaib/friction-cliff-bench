@@ -37,6 +37,7 @@ them share one objective, one observation history and an equal, logged tuning bu
 statistics and scenario splits were pre-registered before any test scenario was labelled. Confirmatory runs use our
 own C++17/CUDA MPPI, which reproduces the reference implementation's random number stream bit for bit.
 \IfGen{gen/abstract_results.tex}{headline result}
+\IfFileExists{gen/abstract_followup.tex}{\input{gen/abstract_followup.tex}}{}
 \end{abstract}
 
 \section{Introduction}
@@ -189,6 +190,8 @@ the reading in advance: if M-B-c departs no more than the student, the student's
 \textbf{A8} handled a failed sanity gate. The PPO teacher must depart no more than O-R + 5\,pp on the tuning
 scenarios (S2). It failed because two of five training seeds collapsed, so A8 added a collapse rollback to every
 PPO run and stated beforehand that, should S2 still fail, the results are reported with that caveat and per seed.
+A ninth amendment, \textbf{A9}, pre-registers a follow-up on fresh test data after the main results
+(Section~\ref{sec:followup}); it does not re-analyse test v1.
 \textbf{Reproducibility.} Each run's MPPI noise is seeded per scenario, method and seed. The observation noise is
 drawn per batch of 64 cars, the batch size used for tuning and testing, so every run is reproducible from the
 commit, the checkpoints and that batch size.
@@ -218,7 +221,8 @@ survive, and the protocol could have shown the opposite.
 very different policies (Table~\ref{tab:seeds}). The best student seed departs less than every MPPI without preview. The worst also
 leaves the lane on dry road, where no adaptation is needed. Its teacher's seeds rank in the same order, so the
 student inherits the teacher's quality. Gate S2 flagged this on tuning data before any test run, and the test split reproduced it seed for
-seed. A benchmark that reported one seed, or the best one, could have reached either conclusion.
+seed. A benchmark that reported one seed, or the best one, could have reached either conclusion. The
+follow-up (Section~\ref{sec:followup}) traces the instability to checkpoint selection and removes it.
 
 \textbf{Caution is the strongest single lever.} The trained policies reach the drop well below the reference speed
 (E6, Figure~\ref{fig:fig_caution}). Driving the bank MPPI at the student's arrival speed (M-B-c) gives one of the lowest departure rates of any
@@ -252,7 +256,51 @@ with compute. Longer history windows slightly hurt both MPPIs. Neither the stude
 distillation target changes its seed-to-seed spread: in every variant the same teacher seeds give the best and the
 worst students, which points at teacher training, not distillation, as the source of the instability.
 
+\section{Follow-up: a repaired learned policy on fresh test data (A9)}\label{sec:followup}
+The main results left one question open: is the learned policy's seed instability a property of the method or of
+our training recipe? A follow-up answers it under its own pre-registration (amendment A9). The diagnosis used only
+training, tuning and a new development split (1,000 scenarios from a new seed, labelled with the frozen oracles);
+no test v1 scenario informed any choice.
+
+\textbf{Diagnosis.} Teacher training is deterministic per seed, so the failing run could be replayed exactly. Each
+candidate cause was tested on ten seeds. Removing the running reward normalisation, penalising an actor mean beyond
+the action bound, a longer discount horizon and annealing the exploration noise did not remove the failures, or
+made them worse. The cause was checkpoint selection. The trainer kept the checkpoint with the best \emph{stochastic}
+training success, but the policy is deployed with its mean action. The two can disagree sharply: the collapsed
+seed's kept checkpoint succeeded in most noisy training episodes, yet its mean policy left the lane on most tuning
+scenarios, while the checkpoint ten iterations earlier was safe.
+
+\textbf{Fix.} Every ten iterations the mean policy is run once on a held-out validation library (2,048 scenarios
+from a separate seed, with the observation-noise stream reset so that checkpoints see identical inputs), and the
+best checkpoint on it is kept. This is ordinary model selection on held-out data, measured the way the policy is
+used. P-S2 and P-SP2 are the current-friction and preview-teacher students trained this way; everything else is
+the tuned A8 configuration.
+
+\textbf{Protocol.} Test pool v2 consists of three 1,000-scenario blocks that were declared and hash-frozen with
+the original splits and never labelled or run before A9 was committed. All follow-up checkpoints and data files
+are hash-frozen in a ledger, and the runner refuses to start on any mismatch. The development data showed that the
+repaired students are safe partly because they drive slower, so a ``beats MPPI'' test would have compared speeds,
+not adaptation. The one confirmatory test is therefore \textbf{H4}: at matched dry pace, P-SP2 departs at most
+2\,pp more than the bank MPPI slowed to P-SP2's pace (M-Bc; its speed factor was interpolated on development data),
+with the pace match required to be within 3\,pp. \textbf{H5} is a reliability rule: gate S2 must hold for each of
+the ten P-SP2 seeds separately. All seeds are reported.
+
 \IfGen{gen/followup.tex}{follow-up (prereg A9): fixed learned policy on test pool v2}
+
+\IfFileExists{../docs/results/fig_followup.png}{\begin{figure}[t]\centering
+\includegraphics[width=\linewidth]{fig_followup.png}
+\caption{Follow-up on test v2. (a) Departure of every training seed; the dashed line is gate S2. (b) Departure
+against the dry-road pace tax (95\% CIs); M-Bc is the bank MPPI slowed to P-SP2's pace.}\label{fig:followup}
+\end{figure}}{}
+
+\textbf{Reading.} The repair solves the problem it targets. No seed of the preview-teacher student fails the
+reliability gate, while the original current-friction recipe again produces failing seeds on the new data
+(Figure~\ref{fig:followup}a). It does not make the learned policy better than the model-based one. At matched pace
+the two cannot be told apart at this sample size, and both are far safer than the full-speed bank MPPI only because
+they drive slower (Figure~\ref{fig:followup}b). Applied to the current-friction student, the repair also removes the
+catastrophic seed, but one seed still fails the gate, and it departs as often on a dry road as with the friction
+drop. Checkpoint selection cannot repair a run that never learned to keep its lane. The recipe that worked is a
+preview teacher, checkpoint selection on deterministic held-out validation, and reporting every seed.
 
 \section{Grounding against real driving data}\label{sec:grounding}
 The simulator's steady-state cornering response is compared with openpilot-engaged driving of ten passenger-car
@@ -271,7 +319,10 @@ undetermined class is reported separately. All training, tuning and evaluation r
 bounds the scenario counts and the number of training seeds. PPO training is unstable across seeds in this task even with
 the stabilisers and the collapse rollback (A8). The learned arm is therefore one tuned configuration with five
 seeds, not the best a larger search or more seeds could reach, and gate S2 failed. Every method was tuned once,
-under the same trial and GPU-hour budget, so a stronger RL recipe could change H1. The H2 mismatch axes cover three
+under the same trial and GPU-hour budget, so a stronger RL recipe could change H1. The follow-up's repair is such a
+recipe, but it came from extra diagnosis on the RL side (logged), and it was tested only for non-inferiority at
+matched pace on fresh data, not as a re-run of H1. Its matched-pace comparator depends on one speed factor set on
+development data. The H2 mismatch axes cover three
 model errors at four levels each on a 500-scenario subset. The recovery-latency and mechanism analyses use a
 separate trace pass and are exploratory. The friction ranges are only partly grounded: the snow range covers the
 road-sensor readings of Section~\ref{sec:grounding}, the ice range is harsher than any of them, and no available

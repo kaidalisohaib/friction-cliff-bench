@@ -55,14 +55,30 @@ def render(d: dict, H: int = 150) -> str:
     ])
 
 
+def policy_sentence(p: dict) -> str:
+    """Learned-policy latency (docs/results/compute_policy.json, scripts/bench_policy.py)."""
+    c = {(r["device"], r["threads"], r["cars"]): r for r in p["cells"]}
+    one = c[("cpu", 1, 1)]
+    gpu = c[("cuda", None, 64)]
+    shared = "GPU shared" if p["gpu_shared"] else "GPU otherwise idle"
+    ms = lambda r: f"{r['median'] * 1e3:.3f} [{r['lo'] * 1e3:.3f}, {r['hi'] * 1e3:.3f}]"  # sub-millisecond
+    return (f"For comparison, one forward pass of the learned student (GRU over $W = {p['W']}$ feature vectors and an "
+            f"MLP actor; feature computation excluded) takes {ms(one)}\\,ms for one car on a single CPU thread and "
+            f"{ms(gpu)}\\,ms for 64 cars on the GPU (median of N = {p['reps']}, {shared}).\n")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--json", default="docs/results/compute_benchmarks.json")
+    ap.add_argument("--policy", default="docs/results/compute_policy.json", help="scripts/bench_policy.py output")
     ap.add_argument("--out", default="paper/gen/compute.tex")
     a = ap.parse_args()
     out = Path(a.out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(render(json.loads(Path(a.json).read_text())))
+    txt = render(json.loads(Path(a.json).read_text()))
+    if Path(a.policy).exists():
+        txt += policy_sentence(json.loads(Path(a.policy).read_text()))
+    out.write_text(txt)
     print(f"wrote {out}")
 
 

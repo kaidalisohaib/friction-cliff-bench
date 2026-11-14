@@ -20,10 +20,12 @@ fi
 PYTHONPATH=. uv run python scripts/make_figures.py --root $ROOT --labels labels/test_v1_T0.jsonl \
     --split splits/test_v1_T0.jsonl --out docs/results --tex paper/gen
 PYTHONPATH=. uv run python scripts/compute_tex.py
-PYTHONPATH=. uv run python scripts/readme_results.py
-if [ "$(n runs/eval_v2/main jsonl)" -gt 0 ]; then   # follow-up (prereg A9; eval/followup.py)
+v2() { { ls runs/eval_v2/$1/*_s*.jsonl 2>/dev/null || true; } | wc -l; }
+if [ "$(v2 main)" -gt 0 ]; then   # follow-up (prereg A9; eval/followup.py); before the README block uses it
+    for s in main dry; do [ "$(v2 $s)" -ge 50 ] || echo "WARNING: runs/eval_v2/$s has $(v2 $s)/50 files"; done
     PYTHONPATH=. uv run python -m eval.followup > /dev/null
 fi
+PYTHONPATH=. uv run python scripts/readme_results.py
 if [ "$(n runs/eval_test/exploratory jsonl)" -gt 0 ]; then   # exploratory E1-E3 (scripts/exploratory.py)
     PYTHONPATH=. uv run python scripts/exploratory.py analyze > /dev/null
 fi

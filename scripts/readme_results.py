@@ -1,8 +1,9 @@
 """Fill the README results block from harness output (no hand-typed numbers).
 
 Replaces the text between `<!-- RESULTS:BEGIN -->` and `<!-- RESULTS:END -->` in README.md with a summary built
-from docs/results/results.json (eval/analysis.py via scripts/make_figures.py), the S2 record and the compute
-benchmark JSON. Every rate comes with its N and a 95% CI.
+from docs/results/results.json (eval/analysis.py via scripts/make_figures.py), the S2 record, the compute
+benchmark JSON and, if present, the A9 follow-up (docs/results/followup.json, eval/followup.py). Every rate
+comes with its N and a 95% CI.
 
 Usage: PYTHONPATH=. uv run python scripts/readme_results.py [--results docs/results/results.json] [--readme README.md]
 """
@@ -119,14 +120,25 @@ def main() -> None:
     ap.add_argument("--s2", default="ledgers/s2_gate_A8.json")
     ap.add_argument("--compute", default="docs/results/compute_benchmarks.json")
     ap.add_argument("--readme", default="README.md")
+    ap.add_argument("--followup", default="docs/results/followup.json", help="A9 follow-up (eval/followup.py)")
     a = ap.parse_args()
     res = json.loads(Path(a.results).read_text())
     s2 = json.loads(Path(a.s2).read_text()) if Path(a.s2).exists() else None
     comp = json.loads(Path(a.compute).read_text()) if Path(a.compute).exists() else None
+    body = render(res, s2, comp)
+    if Path(a.followup).exists():
+        from eval.followup import readme_lines
+        pol = Path("docs/results/compute_policy.json")
+        if pol.exists():
+            c = {(r["device"], r["threads"], r["cars"]): r for r in json.loads(pol.read_text())["cells"]}[("cpu", 1, 1)]
+            body += (f"\n- **Learned-policy latency:** one forward pass of the student takes {c['median'] * 1e3:.2f} ms "
+                     f"for one car on one CPU thread (median of N = {c['n']}, feature computation excluded; "
+                     "[`docs/results/compute_policy.md`](docs/results/compute_policy.md)).")
+        body += "\n" + "\n".join(readme_lines(json.loads(Path(a.followup).read_text())))
     readme = Path(a.readme)
     txt = readme.read_text()
     i, j = txt.index(BEGIN) + len(BEGIN), txt.index(END)
-    readme.write_text(txt[:i] + "\n" + render(res, s2, comp) + "\n" + txt[j:])
+    readme.write_text(txt[:i] + "\n" + body + "\n" + txt[j:])
     print(f"updated {readme}")
 
 

@@ -31,12 +31,14 @@ def test_h5_seed_gate_and_exploratory_contrasts(tmp_path):
     g = res["H5"]["gate"]
     assert g["P-SP2"]["n_pass"] == 10 and res["H5"]["holds"]
     assert g["P-S"]["n_pass"] < 10  # the 0.7 and 0.15 seeds fail O-R + 5 pp
-    assert {"P-S_minus_P-S2", "P-S_minus_P-SP2", "P-SP_minus_P-SP2", "P-SP2_top5"} <= set(res["exploratory"])
+    assert {"P-S_minus_P-S2", "P-S_minus_P-SP2", "P-SP_minus_P-SP2", "P-SP2_top5",
+            "post_hoc_P-SP2_top5_minus_MBc_pace_tax"} <= set(res["exploratory"])
+    assert abs(res["exploratory"]["post_hoc_P-SP2_top5_minus_MBc_pace_tax"]["estimate"]) < 0.01  # same pace in fixture
     assert len(res["methods"]["P-SP2"]["per_seed"]) == 10
     md = F.markdown(res)
     assert "H4" in md and "H5" in md
     tx = F.tex(res)
-    assert "\\section{Follow-up" in tx and "H4" in tx and "\\\\" in tx and "\\%" in tx
+    assert "Test pool v2" in tx and "H4" in tx and "\\\\" in tx and "\\%" in tx
 
 
 def test_h4_non_inferior_at_matched_pace_and_not_when_pace_differs(tmp_path):
@@ -51,3 +53,20 @@ def test_h4_non_inferior_at_matched_pace_and_not_when_pace_differs(tmp_path):
 def test_pace_tax_is_relative_to_O_R(tmp_path):
     res = F.analyze(_fixture(tmp_path), n_boot=1000)
     assert abs(res["methods"]["M-B"]["dry_pace_tax"]["estimate"] - 0.04) < 0.005
+
+
+def test_abstract_and_readme_fragments_follow_the_verdicts(tmp_path):
+    res = F.analyze(_fixture(tmp_path / "a"), n_boot=1000)
+    ab = F.abstract_tex(res)
+    assert "non-inferior" in ab and "all 10 training seeds" in ab and "\\,pp" in ab and " pp" not in ab
+    rd = "\n".join(F.readme_lines(res))
+    assert "| P-SP2 | 10 |" in rd and "**H4** (" in rd and "**H5** (" in rd
+    res = F.analyze(_fixture(tmp_path / "b", prog_psp2=80.0, prog_mbc=86.0), n_boot=1000)
+    assert "not interpreted" in F.abstract_tex(res)
+    assert F.abstract_tex({"methods": {}}) == "" and F.readme_lines({"methods": {}}) == []
+
+
+def test_figure_renders(tmp_path):
+    res = F.analyze(_fixture(tmp_path / "f"), n_boot=500)
+    F.figure(res, tmp_path / "fig.png")
+    assert (tmp_path / "fig.png").stat().st_size > 10_000

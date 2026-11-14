@@ -14,7 +14,11 @@ friction model: the friction-blind planner keeps believing it can turn.*
 5 seeds, and the confirmatory evaluation is done: see [Results](#results) and the
 [technical report](paper/main.tex) (`cd paper && tectonic main.tex`). **In short:** under matched information and
 budget, the RMA student did not beat the bank-adaptive MPPI. Its five training seeds ranged from excellent to failing,
-and much of the apparent robustness to a friction drop comes from slowing down early. The protocol was
+and much of the apparent robustness to a friction drop comes from slowing down early. A pre-registered follow-up
+(amendment A9) traced the seed instability to checkpoint selection (training kept checkpoints by noisy training
+success, but the policy is deployed without noise), fixed it, and re-tested on fresh scenarios: the repaired
+preview-teacher student passed the reliability gate on every training seed and was non-inferior to the bank MPPI at
+matched pace, though not better ([follow-up results](#results)). The protocol was
 [pre-registered](docs/PREREGISTRATION.md) (`prereg-v1`) before any test scenario was labelled or evaluated; later
 changes are dated amendments.
 
@@ -105,6 +109,22 @@ Confirmatory test split: 4,000 scenarios, 3,009 of them reactive-feasible, 5 see
 - Holm–Bonferroni over the three pre-registered tests (α = 0.05): none significant. p = H1 1.000, H3 0.075, H2 1.000.
 - **Adaptation or caution?** (exploratory, rule fixed in A7 before the test run) The bank MPPI driven at the student's arrival speed departs 0.006 vs P-S 0.190; difference -18.4 pp [-45.2, -1.9], so no student advantage to explain. Slowing down has a price: M-B-c loses 16.0% [15.4, 16.7] of dry-road progress against O-R, M-B 4.2% [4.0, 4.5].
 - **Compute** (NVIDIA GeForce RTX 5090 Laptop GPU, median of N = 30): one MPPI control step (K = 1,024 samples, H = 150) takes 15.3 ms in C++/CUDA vs 15.8 ms in Warp. For 64 cars at once: 46.8 vs 58.9 ms. Details: [`docs/results/compute_benchmarks.md`](docs/results/compute_benchmarks.md).
+- **Learned-policy latency:** one forward pass of the student takes 0.19 ms for one car on one CPU thread (median of N = 300, feature computation excluded; [`docs/results/compute_policy.md`](docs/results/compute_policy.md)).
+
+**Follow-up (pre-registered amendment A9, fresh test pool v2, N = 2,233 reactive-feasible scenarios).** The learned policy's training was repaired (checkpoints selected on deterministic held-out validation; diagnosis in the technical report, Section 10) and re-tested. Full tables: [`docs/results/followup.md`](docs/results/followup.md).
+
+| method | seeds | departure [95% CI] | per-seed range | dry pace tax [95% CI] |
+|---|---|---|---|---|
+| O-R | 5 | 0.0400 [0.0325, 0.0474] | 0.038–0.044 | 0.0% [-0.0, 0.0] |
+| M-B | 5 | 0.0325 [0.0263, 0.0393] | 0.030–0.036 | 4.2% [4.1, 4.3] |
+| M-Bc | 5 | 0.0055 [0.0029, 0.0084] | 0.004–0.008 | 13.8% [13.5, 14.1] |
+| P-S | 10 | 0.1026 [0.0146, 0.2448] | 0.000–0.704 | 18.7% [14.9, 22.7] |
+| P-SP | 5 | 0.0131 [0.0013, 0.0261] | 0.000–0.030 | 13.3% [7.6, 17.8] |
+| P-S2 | 10 | 0.0236 [0.0050, 0.0508] | 0.000–0.135 | 18.8% [15.7, 21.8] |
+| P-SP2 | 10 | 0.0085 [0.0037, 0.0142] | 0.001–0.023 | 14.1% [12.4, 16.0] |
+
+- **H4** (P-SP2 against M-Bc, the bank MPPI slowed to P-SP2's pace): at matched pace its lane-departure rate is non-inferior to the bank MPPI's (difference +0.3 pp [-0.3, +0.9], margin 2 pp).
+- **H5** (P-SP2): all 10 training seeds pass the per-seed reliability gate (P-S 8/10; P-SP 5/5; P-S2 9/10; P-SP2 10/10).
 <!-- RESULTS:END -->
 
 ## Limitations (by design)

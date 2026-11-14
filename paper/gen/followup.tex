@@ -1,0 +1,19 @@
+\textbf{Results.} Test pool v2 (the pre-declared top-up blocks, never used before): $N=2{,}233$ reactive-feasible scenarios; departure with 95\% hierarchical-bootstrap CIs.
+
+\begin{table}[t]\centering\small\begin{tabular}{lcccc}\toprule method & seeds & departure [95\% CI] & dry pace tax & per-seed range \\\midrule
+
+O-R & 5 & 0.0400 [0.0325, 0.0474] & 0.0\% & 0.038--0.044 \\
+M-B & 5 & 0.0325 [0.0263, 0.0393] & 4.2\% & 0.030--0.036 \\
+M-Bc & 5 & 0.0055 [0.0029, 0.0084] & 13.8\% & 0.004--0.008 \\
+P-S & 10 & 0.1026 [0.0146, 0.2448] & 18.7\% & 0.000--0.704 \\
+P-SP & 5 & 0.0131 [0.0013, 0.0261] & 13.3\% & 0.000--0.030 \\
+P-S2 & 10 & 0.0236 [0.0050, 0.0508] & 18.8\% & 0.000--0.135 \\
+P-SP2 & 10 & 0.0085 [0.0037, 0.0142] & 14.1\% & 0.001--0.023 \\
+
+\bottomrule\end{tabular}\caption{Test v2. P-S2/P-SP2: checkpoints selected by deterministic validation; M-Bc: bank MPPI at the pace of P-SP2.}\label{tab:followup}\end{table}
+
+\textbf{H4 (non-inferiority at matched pace).} departure(P-SP2) $-$ departure(M-Bc) $=$ +0.3\,pp [-0.3, +0.9], margin 2\,pp; dry pace tax difference +0.3\,pp [-1.4, +2.2]. Non-inferiority is shown; superiority is not shown.
+
+\textbf{H5 (seed reliability).} Gate S2 per seed (departure $\le$ O-R $+\,5$\,pp): P-S 8/10; P-SP 5/5; P-S2 9/10; P-SP2 10/10. H5 holds.
+
+\textbf{Exploratory.} P-S $-$ P-S2: +7.9\,pp [-1.5, +22.4]; P-S $-$ P-SP2: +9.4\,pp [+0.6, +23.7]; P-SP $-$ P-SP2: +0.5\,pp [-0.8, +1.8]; the P-SP2 seeds of the five best teachers by validation success depart 0.0022 [0.0006, 0.0043], -0.3\,pp [-0.7, -0.0] against M-Bc, but they drive slower (post hoc, not pre-declared: dry pace tax +2.2\,pp [-0.2, +4.2] relative to M-Bc).

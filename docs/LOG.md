@@ -34,6 +34,28 @@ Format per entry: date, phase, hours, what was done, and the verdict for any run
 
 ## Entries
 
+### 2026-11-14 evening: test v2 evaluated; A9 analysed (H4 non-inferior, H5 holds); write-up
+- **Evaluation:** `scripts/eval_v2.py`, 50 + 50 files (main, dry), 2,233 RF scenarios each, all complete; checkpoint
+  hashes verified against `ledgers/A9_frozen.json` by the runner. Analysis: `PYTHONPATH=. uv run python -m eval.followup`.
+- **Prediction → result** (harness, `docs/results/followup.md`, 95% hierarchical-bootstrap CIs):
+  - H4 (P-SP2 non-inferior to M-Bc, margin 2 pp; predicted non-inferior, not superior) → departure difference
+    +0.3 pp [−0.3, +0.9], pace difference +0.3 pp [−1.4, +2.2] (matched): **non-inferior, not superior** ✔.
+  - H5 (all 10 P-SP2 seeds pass S2; predicted holds and ≥ 1 P-S seed fails) → P-SP2 10/10, P-S 8/10 ✔.
+  - P-S − P-S2 (exploratory; predicted lower, CI may include 0) → +7.9 pp [−1.5, +22.4] ✔.
+  - Top-5 P-SP2 − M-Bc (exploratory) −0.3 pp [−0.7, −0.0]. A **post hoc** pace check (added after the results,
+    labelled in the output) shows the subset is slower (+2.2 pp [−0.2, +4.2]), so no claim is made from it.
+- **Engineering check:** the failing P-S2 seed (s2) departs 0.135 on the dry set as well, so it fails at lane
+  keeping, not at adaptation.
+- **Latency** (`scripts/bench_policy.py`, `docs/results/compute_policy.md`; `--force`, because a short h2 recording job
+  shared the GPU): student forward pass 0.194 ms [0.192, 0.200] for one car on one CPU thread (N = 300). The 24-thread,
+  64-car CPU cell is dominated by contention, and the md says so.
+- **Write-up:**
+  - report §10 (diagnosis, fix, protocol, generated results, figure, reading), the abstract sentence and a
+    Limitations sentence;
+  - README results block (generated);
+  - Presentation-only changes to `eval/followup.py`: tex/abstract/README writers, a figure, and the labelled post
+    hoc pace line. The A9 analysis logic is unchanged.
+
 ### 2026-11-14 morning: recipe chosen on dev; amendment A9 committed; test v2 started
 - **Dev split, students** (737 RF; engineering numbers):
   - P-SP2 (preview teacher + validation selection), 10 seeds: every seed reliable. Mean dev pace tax 13.9%.

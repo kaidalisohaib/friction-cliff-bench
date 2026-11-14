@@ -378,3 +378,12 @@ What A5 adds to V6/V7/EVAL_PROTOCOL and why:
   3. **Non-inferiority (2 pp) + per-seed S2 gate (chosen).**
 - **Why test v2 = T1–T3:** pre-declared and hash-frozen on 2026-11-08, before any method existed, and never
   labelled. That is a fresher test set than any new sample drawn now.
+
+## D37: One post hoc line in the follow-up output: the dry pace tax of the top-5 P-SP2 subset. DECIDED 2026-11-14
+- **Context.** After the v2 results, the exploratory top-5 subset (pre-declared in A9) departs less than M-Bc, with
+  a CI upper bound just below 0. A9 checked the pace match only for the full P-SP2 against M-Bc, so a reader could
+  take the subset line as "RL beats MPPI at matched pace".
+- **Decision.** `eval/followup.py` also reports the subset's dry pace tax and its difference from M-Bc. The line is
+  labelled *post hoc* in every output (md, tex). No claim is drawn from the subset. It turned out slower than M-Bc
+  (point estimate +2.2 pp).
+- **Not changed.** H4, H5 and the pre-declared exploratory contrasts: same code, same seeds, same numbers.

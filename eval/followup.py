@@ -104,6 +104,11 @@ def analyze(root: Path, top5: list[int] | None = None, n_boot: int = N_BOOT) -> 
         if "M-Bc" in main:
             d = St.hier_bootstrap_diff(a, mat(main, "M-Bc", "departed"), 4000, np.random.default_rng(13))
             ex["P-SP2_top5_minus_MBc"] = summary(d, float(np.nanmean(a) - np.nanmean(mat(main, "M-Bc", "departed"))))
+        if "P-SP2" in dry and "M-Bc" in dry:  # POST HOC (added 2026-11-14 after the v2 results): is it pace-matched?
+            sd = {"P-SP2_top5": {"sids": dry["P-SP2"]["sids"], "recs": [dry["P-SP2"]["recs"][i] for i in top5]},
+                  "M-Bc": dry["M-Bc"], "O-R": dry["O-R"]}
+            ex["post_hoc_P-SP2_top5_pace_tax"] = pace(sd, "P-SP2_top5")
+            ex["post_hoc_P-SP2_top5_minus_MBc_pace_tax"] = pace_diff(sd, "P-SP2_top5", "M-Bc")
     res["exploratory"] = ex
     return res
 
@@ -132,7 +137,7 @@ def markdown(res: dict) -> str:
                   + ("pace not matched (not interpreted)" if not h["pace_matched"] else
                      ("non-inferior" if h["non_inferior"] else "non-inferiority not shown")
                      + ("; superior" if h["superior"] else "; superiority not shown"))
-                  + f" (p = {h['p']:.4f})."]
+                  + (f" (p = {h['p']:.4f})." if h["p"] > 0 else f" (bootstrap p < 1/{N_BOOT:,}).")]
     if "H5" in res:
         g = res["H5"]["gate"]
         L += ["", f"**H5** (seed reliability: gate S2 per seed, departure ≤ O-R + 5 pp = "
@@ -157,11 +162,19 @@ def markdown(res: dict) -> str:
                      f"[{t['departure']['ci95'][0]:.4f}, {t['departure']['ci95'][1]:.4f}]"
                      + (f"; minus M-Bc {pp(ex['P-SP2_top5_minus_MBc'])}" if "P-SP2_top5_minus_MBc" in ex else "")
                      + ".")
+        if ex.get("post_hoc_P-SP2_top5_pace_tax"):
+            t, dt = ex["post_hoc_P-SP2_top5_pace_tax"], ex["post_hoc_P-SP2_top5_minus_MBc_pace_tax"]
+            L.append(f"- *Post hoc* (added after the v2 results, not pre-declared): the top-5 subset's dry pace tax is "
+                     f"{100 * t['estimate']:.1f}% [{100 * t['ci95'][0]:.1f}, {100 * t['ci95'][1]:.1f}], "
+                     f"{pp(dt)} relative to M-Bc, so the top-5 comparison above is "
+                     + ("within" if abs(dt["estimate"]) <= PACE_TOL else "outside")
+                     + " the A9 pace tolerance (3 pp).")
     return "\n".join(L) + "\n"
 
 
 def tex(res: dict) -> str:
-    """Report fragment (paper/gen/followup.tex); every number from `res`."""
+    """Report fragment (paper/gen/followup.tex; the section header and method text are in paper/main.tex); every
+    number from `res`."""
     M = res["methods"]
 
     def dep(m):
@@ -174,8 +187,7 @@ def tex(res: dict) -> str:
 
     rows = "\n".join(f"{m} & {len(M[m]['per_seed'])} & {dep(m)} & {tax(m)} & "
                       f"{min(M[m]['per_seed']):.3f}--{max(M[m]['per_seed']):.3f} \\\\" for m in M)
-    P = ["\\section{Follow-up: a fixed learned policy on fresh test data (A9)}\\label{sec:followup}",
-         f"Test pool v2 (the pre-declared top-up blocks, never used before): $N={res['n_scenarios']:,}$ reactive-feasible "
+    P = [f"\\textbf{{Results.}} Test pool v2 (the pre-declared top-up blocks, never used before): $N={str(format(res['n_scenarios'], ',')).replace(',', '{,}')}$ reactive-feasible "
          "scenarios; departure with 95\\% hierarchical-bootstrap CIs.",
          "\\begin{table}[t]\\centering\\small\\begin{tabular}{lcccc}\\toprule method & seeds & departure [95\\% CI] & "
          "dry pace tax & per-seed range \\\\\\midrule", rows, "\\bottomrule\\end{tabular}"
@@ -203,9 +215,134 @@ def tex(res: dict) -> str:
                    ("P-SP_minus_P-SP2", "P-SP $-$ P-SP2")):
         if k in ex:
             parts.append(f"{lab}: {pp(ex[k])}".replace(" pp", "\\,pp"))
+    if "P-SP2_top5_minus_MBc" in ex:
+        t = ex["P-SP2_top5"]
+        part = (f"the P-SP2 seeds of the five best teachers by validation success depart "
+                f"{t['departure']['estimate']:.4f} [{t['departure']['ci95'][0]:.4f}, {t['departure']['ci95'][1]:.4f}], "
+                f"{pp(ex['P-SP2_top5_minus_MBc'])} against M-Bc")
+        if ex.get("post_hoc_P-SP2_top5_minus_MBc_pace_tax"):
+            part += (f", but they drive slower (post hoc, not pre-declared: dry pace tax "
+                     f"{pp(ex['post_hoc_P-SP2_top5_minus_MBc_pace_tax'])} relative to M-Bc)")
+        parts.append(part.replace(" pp", "\\,pp"))
     if parts:
         P.append("\\textbf{Exploratory.} " + "; ".join(parts) + ".")
     return "\n\n".join(P) + "\n"
+
+
+def _h4_phrase(res: dict) -> str:
+    h = res["H4"]
+    d = pp(h["diff_PSP2_minus_MBc"])
+    if not h["pace_matched"]:
+        return f"the pace match with the slowed bank MPPI failed, so H4 is not interpreted (departure difference {d})"
+    if h["non_inferior"]:
+        out = (f"at matched pace its lane-departure rate is non-inferior to the bank MPPI's (difference {d}, margin "
+               f"{100 * h['margin']:.0f} pp)")
+        return out + ("" if not h["superior"] else " and lower")
+    return f"at matched pace non-inferiority to the bank MPPI is not shown (difference {d})"
+
+
+def _h5_phrase(res: dict) -> str:
+    g = res["H5"]["gate"].get("P-SP2")
+    if g is None:
+        return ""
+    return (f"all {g['n_seeds']} training seeds pass the per-seed reliability gate" if res["H5"]["holds"] else
+            f"{g['n_pass']} of {g['n_seeds']} training seeds pass the per-seed reliability gate")
+
+
+def abstract_tex(res: dict) -> str:
+    """One abstract sentence (paper/gen/abstract_followup.tex); empty unless H4 and H5 were computed."""
+    if "H4" not in res or "H5" not in res:
+        return ""
+    s = (f"A pre-registered follow-up repairs the learned policy's training (checkpoints selected on deterministic "
+         f"held-out validation) and re-tests it on {res['n_scenarios']:,} fresh reactive-feasible scenarios: "
+         f"{_h4_phrase(res)}, and {_h5_phrase(res)}.")
+    return s.replace("%", "\\%").replace(" pp", "\\,pp") + "\n"
+
+
+def readme_lines(res: dict) -> list[str]:
+    """README follow-up block (scripts/readme_results.py); every number from `res`."""
+    if "H4" not in res:
+        return []
+    M = res["methods"]
+    L = ["", f"**Follow-up (pre-registered amendment A9, fresh test pool v2, N = {res['n_scenarios']:,} "
+             "reactive-feasible scenarios).** The learned policy's training was repaired (checkpoints selected on "
+             "deterministic held-out validation; diagnosis in the technical report, Section 10) "
+             "and re-tested. Full tables: [`docs/results/followup.md`](docs/results/followup.md).", "",
+         "| method | seeds | departure [95% CI] | per-seed range | dry pace tax [95% CI] |", "|---|---|---|---|---|"]
+    for m, r in M.items():
+        d, t = r["departure"], r["dry_pace_tax"]
+        L.append(f"| {m} | {len(r['per_seed'])} | {d['estimate']:.4f} [{d['ci95'][0]:.4f}, {d['ci95'][1]:.4f}] | "
+                 f"{min(r['per_seed']):.3f}–{max(r['per_seed']):.3f} | "
+                 + (f"{100 * t['estimate']:.1f}% [{100 * t['ci95'][0]:.1f}, {100 * t['ci95'][1]:.1f}]" if t else "—")
+                 + " |")
+    L += ["", f"- **H4** (P-SP2 against M-Bc, the bank MPPI slowed to P-SP2's pace): {_h4_phrase(res)}."]
+    if "H5" in res:
+        L.append(f"- **H5** (P-SP2): {_h5_phrase(res)} (" + "; ".join(f"{m} {v['n_pass']}/{v['n_seeds']}"
+                                                         for m, v in res["H5"]["gate"].items()) + ").")
+    return L
+
+
+# Figure palette (validated with the dataviz checker: lightness, chroma, all-pairs CVD and contrast pass); families,
+# with marker shape as a second encoding.
+FAMILY = {"O-R": ("#555555", "D"), "M-B": ("#2a6fbb", "s"), "M-Bc": ("#2a6fbb", "s"), "P-S": ("#3a9a5b", "^"),
+          "P-SP": ("#3a9a5b", "^"), "P-S2": ("#d9650b", "o"), "P-SP2": ("#d9650b", "o")}
+
+# Direct-label offsets (points): the matched-pace pairs sit on top of each other by design.
+LABEL_AT = {"M-Bc": (6, -10, "left"), "P-SP2": (6, 5, "left"), "P-SP": (-6, 5, "right"), "P-S2": (6, 5, "left")}
+
+
+def figure(res: dict, path: Path) -> None:
+    """docs/results/fig_followup.png: (a) departure per training seed against gate S2; (b) departure vs dry pace tax."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    M = res["methods"]
+    fig, axs = plt.subplots(1, 2, figsize=(11, 3.9))
+    ax = axs[0]
+    order = [m for m in ("P-S", "P-S2", "P-SP", "P-SP2", "M-B", "M-Bc") if m in M]
+    rng = np.random.default_rng(0)
+    for i, m in enumerate(order):
+        c, mk = FAMILY[m]
+        y = np.array(M[m]["per_seed"])
+        ax.scatter(i + rng.uniform(-0.12, 0.12, len(y)), y, s=36, color=c, marker=mk, edgecolor="white", lw=1, zorder=3)
+    if "H5" in res:
+        lim = next(iter(res["H5"]["gate"].values()))["limit"]
+        ax.axhline(lim, color="#777777", ls="--", lw=1)
+        ax.text(0.99, lim, "gate S2: O-R + 5 pp ", transform=ax.get_yaxis_transform(), ha="right", va="bottom",
+                fontsize=7, color="#444444")
+    ax.set_xticks(range(len(order)))
+    ax.set_xticklabels([f"{m}\n({len(M[m]['per_seed'])} seeds)" for m in order], fontsize=8)
+    ax.set_ylabel("departure rate per training seed")
+    ax.set_title("(a) one dot per training seed (test v2, reactive-feasible)", fontsize=9)
+    ax = axs[1]
+    for m, r in M.items():
+        t = r["dry_pace_tax"]
+        x = 0.0 if m == "O-R" else (100 * t["estimate"] if t else None)
+        if x is None:
+            continue
+        d = r["departure"]
+        xe = [[0], [0]] if not t else [[100 * (t["estimate"] - t["ci95"][0])], [100 * (t["ci95"][1] - t["estimate"])]]
+        c, mk = FAMILY[m]
+        ax.errorbar(x, d["estimate"], xerr=np.maximum(xe, 0),
+                    yerr=np.maximum([[d["estimate"] - d["ci95"][0]], [d["ci95"][1] - d["estimate"]]], 0),
+                    fmt=mk, color=c, ms=7, capsize=2, lw=1, mec="white", mew=1)
+        dx, dy, ha = LABEL_AT.get(m, (5, 4, "left"))
+        ax.annotate(m, (x, d["estimate"]), textcoords="offset points", xytext=(dx, dy), ha=ha, fontsize=7,
+                    color="#333333")
+    ax.set_xlabel("dry-road pace tax vs O-R [%] (lower = faster)")
+    ax.set_ylabel("departure rate (95% CI)")
+    ax.set_title("(b) safety against speed", fontsize=9)
+    from matplotlib.lines import Line2D
+    fams = [("oracle", "O-R"), ("bank MPPI", "M-B"), ("RL, A8 recipe", "P-S"), ("RL, repaired (A9)", "P-SP2")]
+    ax.legend([Line2D([], [], color=FAMILY[k][0], marker=FAMILY[k][1], ls="", ms=6) for _, k in fams],
+              [n for n, _ in fams], fontsize=7, frameon=False, loc="upper left")
+    for ax in axs:
+        ax.spines[["top", "right"]].set_visible(False)
+        ax.grid(axis="y", color="#e6e6e6", lw=0.6)
+        ax.set_axisbelow(True)
+    fig.tight_layout()
+    fig.savefig(path, dpi=160)
+    plt.close(fig)
 
 
 def main():
@@ -220,6 +357,8 @@ def main():
     Path(a.out + ".md").write_text(markdown(res))
     Path("paper/gen").mkdir(parents=True, exist_ok=True)
     Path("paper/gen/followup.tex").write_text(tex(res))
+    Path("paper/gen/abstract_followup.tex").write_text(abstract_tex(res))
+    figure(res, Path(a.out).parent / "fig_followup.png")
     print(markdown(res))
 
 

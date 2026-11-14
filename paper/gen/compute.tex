@@ -13,3 +13,4 @@ field & 1,024 & 22.4 [21.4, 27.7] & 19.8 [19.3, 20.7] & 1.13 \\
 field & 4,096 & 24.6 [22.4, 25.9] & 20.7 [19.3, 23.7] & 1.19 \\
 field & 16,384 & 32.7 [28.5, 35.4] & 26.4 [24.0, 28.3] & 1.24 \\
 \bottomrule\end{tabular}\end{table}
+For comparison, one forward pass of the learned student (GRU over $W = 12$ feature vectors and an MLP actor; feature computation excluded) takes 0.194 [0.192, 0.200]\,ms for one car on a single CPU thread and 0.188 [0.172, 1.293]\,ms for 64 cars on the GPU (median of N = 300, GPU shared).

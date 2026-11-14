@@ -78,6 +78,9 @@ def main():
     for c in res["cells"]:
         L.append(f"| {c['device']} | {c['threads'] or '—'} | {c['cars']} | {c['median'] * 1e3:.3f} | "
                  f"{c['lo'] * 1e3:.3f}–{c['hi'] * 1e3:.3f} |")
+    L += ["", "All-thread CPU cells contend with any other CPU load on the machine (here: "
+          + ("another project's GPU job was running" if res["gpu_shared"] else "none") + "); the single-thread cells "
+          "are the deployment-relevant ones."]
     (OUT / "compute_policy.md").write_text("\n".join(L) + "\n")
 
 
