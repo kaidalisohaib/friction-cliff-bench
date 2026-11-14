@@ -19,6 +19,7 @@ SETS = {
     "test_v1_T3.jsonl": lambda: S.test_pool(3),
     "tuning_v1.jsonl": S.tuning_split,
     "tuning_v1_b2.jsonl": S.tuning_block2,  # prereg A4.7
+    "dev_v1.jsonl": S.dev_split,  # RL follow-up development split (D35); not frozen by A2
 }
 
 

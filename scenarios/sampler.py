@@ -137,6 +137,14 @@ def tuning_block2() -> list[Scenario]:
     return sample(200, TUNING_B2_SEED, "U2-")
 
 
+DEV_SEED = _seed("friction-cliff-bench dev split v1 (RL follow-up, D35)")
+
+
+def dev_split() -> list[Scenario]:
+    """1,000-scenario development split for the RL follow-up (D35): recipe decisions only; never a test set."""
+    return sample(1000, DEV_SEED, "D-")
+
+
 def header() -> dict:
     return {"spec": SPEC_VERSION, "n_cells": N_CELLS, "lead_in": T.LEAD_IN, "arc_angle_deg": 90.0,
             "clothoid": "R/3 clipped [15, 80] m", "ds": T.DS, "lane_width": T.LANE_WIDTH,

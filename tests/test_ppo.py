@@ -63,3 +63,9 @@ def test_rollback_rule_needs_a_sustained_collapse():
     assert not should_rollback([0.3, 0.5, 0.3], 0.8, 0.5, 3)       # one point recovered above 0.4
     assert should_rollback([0.7, 0.3, 0.2, 0.1], 0.8, 0.5, 3)      # last three below 0.4
     assert not should_rollback([0.0, 0.0, 0.0], 0.0, 0.5, 3)       # no best yet
+
+
+def test_ppo_config_defaults_reproduce_the_A8_recipe():
+    from rl.ppo import PPOConfig
+    c = PPOConfig()
+    assert c.norm_reward is True and c.bound_coef == 0.0 and c.snapshot_every == 0

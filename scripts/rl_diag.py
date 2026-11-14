@@ -41,6 +41,7 @@ def main():
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     t0 = time.time()
+    print("config:", json.dumps(asdict(cfg)), flush=True)
     lib = Lb.load(Path("runs/rl/lib_train_v1.npz"))
     model, hist = train_ppo(KIND[a.method], lib, cfg, seed=a.seed, device=a.device,
                             log=lambda s: print(s, flush=True))

@@ -107,6 +107,7 @@ class PPOConfig:
     # follow-up options (D35); the defaults reproduce the A8 recipe exactly
     norm_reward: bool = True  # divide rewards by the running std of the discounted return
     snapshot_every: int = 0  # keep a copy of the weights every this many iterations in hist["snapshots"] (0 = off)
+    bound_coef: float = 0.0  # weight of a penalty on the actor mean outside [-1, 1] (mean of relu(|mu| - 1)^2)
 
 
 def should_rollback(recent: list[float], best: float, frac: float, patience: int) -> bool:
@@ -243,6 +244,8 @@ def train_ppo(kind: str, lib: dict, cfg: PPOConfig, seed: int = 0, device: str =
                 upd["kl"].append(kl)
                 upd["clip"].append(float(((ratio - 1).abs() > cfg.clip).float().mean()))
                 upd["sat"].append(float((mu.detach().abs() > 1).float().mean()))
+                upd.setdefault("sat_long", []).append(float((mu.detach()[:, 1].abs() > 1).float().mean()))
+                upd.setdefault("mu_long", []).append(float(mu.detach()[:, 1].mean()))
                 if not warm and kl > cfg.target_kl:
                     stop = True
                     break
@@ -252,6 +255,8 @@ def train_ppo(kind: str, lib: dict, cfg: PPOConfig, seed: int = 0, device: str =
                 vl = ((ac.value(flat["f"][j], flat["pv"][j], flat["pr"][j]) - flat["ret"][j]) ** 2).mean()
                 ent = (ac.log_std + 0.5 * np.log(2 * np.pi * np.e)).sum()
                 loss = cfg.vf_coef * vl if warm else pl + cfg.vf_coef * vl - cfg.ent_coef * ent
+                if cfg.bound_coef > 0 and not warm:
+                    loss = loss + cfg.bound_coef * ((mu.abs() - 1).clamp(min=0) ** 2).sum(1).mean()
                 if drv is not None and not warm:
                     frac = max(0.0, 1.0 - it / max(cfg.bc_reg_end * iters, 1.0))
                     loss = loss + cfg.bc_reg * frac * ((mu - flat["bc"][j]) ** 2).sum(1).mean()
