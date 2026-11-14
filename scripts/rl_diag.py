@@ -28,6 +28,7 @@ def main():
     ap.add_argument("--set", action="append", default=[])
     ap.add_argument("--device", default="cuda:0")
     ap.add_argument("--out", default="runs/rl_fix")
+    ap.add_argument("--budget-s", type=float, default=None, help="stop after this wall time (schedule unchanged)")
     a = ap.parse_args()
     from scripts.tune_method import PPO_STEPS
     bp = json.loads(Path(f"runs/tuning/best_{a.method}.json").read_text())["best_params"]
@@ -43,8 +44,10 @@ def main():
     t0 = time.time()
     print("config:", json.dumps(asdict(cfg)), flush=True)
     lib = Lb.load(Path("runs/rl/lib_train_v1.npz"))
+    val_lib = Lb.load(Path("runs/rl/lib_val_v1.npz")) if cfg.val_every else None
     model, hist = train_ppo(KIND[a.method], lib, cfg, seed=a.seed, device=a.device,
-                            log=lambda s: print(s, flush=True))
+                            log=lambda s: print(s, flush=True),
+                            time_budget_s=a.budget_s, val_lib=val_lib)
     stem = out / f"{a.tag}_s{a.seed}"
     snaps = hist.pop("snapshots", None)
     if snaps:

@@ -34,6 +34,41 @@ Format per entry: date, phase, hours, what was done, and the verdict for any run
 
 ## Entries
 
+### 2026-11-13/14 night: RL follow-up (D35), diagnosis of the PPO seed failures
+Training library, tuning split and the new dev split only. No test data used. Engineering numbers, not results.
+- **Tools:**
+  - `scripts/rl_diag.py`: one PPO run with `--set` overrides, logging-only diagnostics, snapshots;
+  - `scripts/rl_eval_tuning.py`: departure, dry departure, dry pace tax vs O-R and arrival ratio on tuning or dev
+    RF scenarios;
+  - `scripts/rl_distill.py`;
+  - `runs/rl_fix/queue.sh`.
+  - Runs are deterministic per seed: the A8 seed-4 collapse reproduces bit for bit.
+- **Dev split:** `splits/dev_v1.jsonl` (1,000 scenarios, new seed), labelled with the frozen oracles: 737 RF.
+  - 2,048-entry validation library `runs/rl/lib_val_v1.npz` (new seed, nominal parameters).
+- **Hypotheses tested** (10 seeds each; prediction → result):
+  1. *Running reward normalisation feeds the collapse:* the std grows 3–13× as failures rise.
+     - norm0 fixed seed 4, but over 10 seeds it was no better (4/10 bad on tuning). → **Rejected.** One seed
+       misled; ten caught it.
+  2. *The actor mean saturates past the action bound:* bounds penalty. Seed 4 collapses identically.
+     → **Rejected.**
+  3. *A longer horizon helps:* gamma 0.998. 9/10 seeds hit the rollback limit. → **Rejected (much worse).**
+  4. *Checkpoint selection is misaligned:*
+     - Training keeps the best *stochastic* training-success checkpoint; evaluation runs the *mean* action.
+     - Seed 4's kept checkpoint (it 60) succeeds in 69% of noisy training episodes, yet departs on 0.746 of the
+       RF tuning runs deterministically. The checkpoint 10 iterations earlier departs on 0.059.
+     - The deterministic policy changes abruptly between nearby iterations.
+     - → **Confirmed.** Fix: select on deterministic success on a held-out validation library (`val_every=10`,
+       `select_on_val`).
+     - Dev departure of the teacher: mean over seeds 0.126 (old recipe, seeds 0–8) → 0.030 (seeds 0–9).
+       Worst seed 0.744 → 0.113.
+  5. *Annealing the exploration std* (so the trained and deployed policies converge) → **worse** (lower val
+     success on 10 seeds).
+- **MPPI frontier on dev** (M-B@c, departure at dry pace tax):
+  - c = 1: 0.0228 at 4.2%; 0.9: 0.0054 at 8.0%; 0.8: 0.0054 at 11.8%; 0.7: 0.0013 at 15.5%.
+  - The best RL teachers reach 0 departures at 13–14%. RL is on, or marginally inside, the frontier, not
+    clearly beyond it.
+- **Mistake:** a `pkill -f` pattern matched my own shell and killed it (no damage).
+
 ### 2026-11-13 08:15: exploratory E1–E3 done
 - **Coverage:** 17 variants × 5 seeds × 500 RF test scenarios, all complete at 08:13. Outputs:
   - `docs/results/exploratory.{md,json}`;

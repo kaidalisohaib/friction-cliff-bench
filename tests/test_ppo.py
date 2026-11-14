@@ -69,3 +69,21 @@ def test_ppo_config_defaults_reproduce_the_A8_recipe():
     from rl.ppo import PPOConfig
     c = PPOConfig()
     assert c.norm_reward is True and c.bound_coef == 0.0 and c.snapshot_every == 0
+
+
+def test_deterministic_validation_selection_and_std_annealing():
+    from rl.env import FrictionEnv
+    from rl.ppo import ActorCritic, deterministic_eval
+    scs, snap, lib = _lib()
+    ac = ActorCritic("teacher")
+    env = FrictionEnv(lib, len(scs), 1, "cpu", seed=3, sequential=True)
+    r1, r2 = deterministic_eval(ac, env), deterministic_eval(ac, env)
+    assert r1["n"] == len(scs)  # every entry once
+    assert all(r1[k] == r2[k] for k in ("success", "departed", "term", "len_s"))  # repeatable (same noise)
+    assert abs(r1["return"] - r2["return"]) < 1e-4 * abs(r1["return"])
+    cfg = PPOConfig(n_envs=8, horizon=8, total_steps=8 * 8 * 4, epochs=1, bc_steps=3, critic_warmup=0, val_every=1,
+                    select_on_val=True, std_final_frac=0.5)
+    ac, hist = train_ppo("teacher", lib, cfg, device="cpu", log=lambda s: None, val_lib=lib)
+    assert len(hist["val"]) >= 2 and all(v["n"] == len(scs) for v in hist["val"])
+    s0 = np.array([cfg.init_std, cfg.init_std_long])
+    assert np.allclose(ac.log_std.exp().detach().numpy(), 0.5 * s0, rtol=1e-4) or hist["best_it"] < 3

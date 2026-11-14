@@ -108,6 +108,9 @@ class PPOConfig:
     norm_reward: bool = True  # divide rewards by the running std of the discounted return
     snapshot_every: int = 0  # keep a copy of the weights every this many iterations in hist["snapshots"] (0 = off)
     bound_coef: float = 0.0  # weight of a penalty on the actor mean outside [-1, 1] (mean of relu(|mu| - 1)^2)
+    val_every: int = 0  # deterministic (mean-action) validation on held-out scenarios every this many iterations
+    select_on_val: bool = False  # keep the checkpoint with the best validation success instead of training success
+    std_final_frac: float = 1.0  # < 1: exploration std is not learned but annealed linearly to this fraction
 
 
 def should_rollback(recent: list[float], best: float, frac: float, patience: int) -> bool:
@@ -151,8 +154,30 @@ def bc_warm_start(ac: "ActorCritic", env: FrictionEnv, steps: int, seed: int, lo
     env._reset(torch.ones(env.n, dtype=torch.bool, device=env.dev))
 
 
+@torch.no_grad()
+def deterministic_eval(ac: "ActorCritic", env: FrictionEnv) -> dict:
+    """Run the mean policy once on every entry of a sequential env (FrictionEnv(..., sequential=True) with
+    n_envs = library size); returns success / departure / termination rates and the mean episode length."""
+    env.feat.t = 0  # same observation-noise realisation on every call, so checkpoints are compared like for like
+    env.feat.gen.manual_seed(env.feat.gen.initial_seed())
+    env.next_seq = env.n
+    env.active[:] = True
+    env._reset(torch.ones(env.n, dtype=torch.bool, device=env.dev), first=True)
+    res = {k: [] for k in ("success", "departed", "term", "len_s", "return")}
+    f, pv, pr = _inputs(env)
+    for _ in range(int(80.0 / 0.02)):
+        _, _, _, info = env.step(ac.mean(f, pv, pr))
+        if info:
+            for k in res:
+                res[k] += info[k].float().tolist()
+        if not bool(env.active.any()):
+            break
+        f, pv, pr = _inputs(env)
+    return {k: float(np.mean(v)) if v else float("nan") for k, v in res.items()} | {"n": len(res["success"])}
+
+
 def train_ppo(kind: str, lib: dict, cfg: PPOConfig, seed: int = 0, device: str = "cuda:0", log=print,
-              time_budget_s: float | None = None, env=None) -> tuple[ActorCritic, dict]:
+              time_budget_s: float | None = None, env=None, val_lib: dict | None = None) -> tuple[ActorCritic, dict]:
     torch.manual_seed(seed)
     if env is None:
         env = FrictionEnv(lib, cfg.n_envs, cfg.hist_len, device, seed=seed, reward_scale=cfg.reward_scale)
@@ -165,12 +190,22 @@ def train_ppo(kind: str, lib: dict, cfg: PPOConfig, seed: int = 0, device: str =
         from control.estimator import BehaviorDriver
         drv = BehaviorDriver(env, seed + 99)
         drv.mult[:] = 1.0
-    a_params = [ac.log_std] + list(ac.actor.parameters()) + (list(ac.enc.parameters()) if ac.kind != "dr" else [])
+    anneal = cfg.std_final_frac < 1.0
+    log_std0 = ac.log_std.detach().clone()
+    if anneal:
+        ac.log_std.requires_grad_(False)
+    a_params = ([] if anneal else [ac.log_std]) + list(ac.actor.parameters()) + \
+        (list(ac.enc.parameters()) if ac.kind != "dr" else [])
+    venv = None
+    if cfg.val_every and val_lib is not None:
+        venv = FrictionEnv(val_lib, len(val_lib["track_id"]), cfg.hist_len, device, seed=seed + 5000,
+                           reward_scale=cfg.reward_scale, sequential=True)
+    vbest = (-1.0, None, -1)
     opt = torch.optim.Adam(a_params, lr=cfg.lr)
     opt_c = torch.optim.Adam(ac.critic.parameters(), lr=cfg.lr_critic)
     n, T = cfg.n_envs, cfg.horizon
     iters = max(1, cfg.total_steps // (n * T))
-    hist = {"iter": [], "succ": [], "ret": [], "steps": []}
+    hist = {"iter": [], "succ": [], "ret": [], "steps": [], "val": []}
     disc = torch.zeros(n, device=dev)  # running discounted return per env (reward normalization)
     rstat = [0.0, 1.0, 1e-4]  # mean, var, count of the discounted returns
     best = (-1.0, None, -1)
@@ -181,6 +216,9 @@ def train_ppo(kind: str, lib: dict, cfg: PPOConfig, seed: int = 0, device: str =
     t0 = time.time()
     f, pv, pr = _inputs(env)
     for it in range(iters):
+        if anneal:  # fixed for the whole iteration, so the stored log-probs match the update's policy
+            frac = 1.0 + (cfg.std_final_frac - 1.0) * it / max(iters - 1, 1)
+            ac.log_std.data = log_std0 + float(np.log(frac))
         buf = {k: [] for k in ("f", "pv", "pr", "a", "logp", "v", "r", "d", "bc")}
         with torch.no_grad():
             for _ in range(T):
@@ -272,6 +310,12 @@ def train_ppo(kind: str, lib: dict, cfg: PPOConfig, seed: int = 0, device: str =
             s = float(np.mean(win_s)) if win_s else float("nan")
             rr = float(np.mean(win_r)) if win_r else float("nan")
             hist["iter"].append(it), hist["succ"].append(s), hist["ret"].append(rr), hist["steps"].append((it + 1) * n * T)
+            if venv is not None and not warm and it % cfg.val_every == 0:
+                vr = deterministic_eval(ac, venv)
+                hist["val"].append({"it": it, **vr})
+                win_d.setdefault("val_succ", []).append(vr["success"])
+                if vr["success"] >= vbest[0]:
+                    vbest = (vr["success"], {k: v.detach().clone() for k, v in ac.state_dict().items()}, it)
             dg = {k: float(np.mean(v)) for k, v in win_d.items() if v}
             dg.update({k: float(np.mean(v)) for k, v in upd.items() if v})
             dg.update({"it": it, "succ": s, "ret": rr, "rstd": float(np.sqrt(rstat[1]))})
@@ -302,7 +346,16 @@ def train_ppo(kind: str, lib: dict, cfg: PPOConfig, seed: int = 0, device: str =
         if time_budget_s and time.time() - t0 > time_budget_s:
             log(f"[{kind}] time budget reached at it {it}")
             break
-    if best[1] is not None:
+    if cfg.select_on_val and venv is not None:
+        vr = deterministic_eval(ac, venv)  # the final weights are a candidate too
+        hist["val"].append({"it": iters, **vr})
+        if vr["success"] >= vbest[0]:
+            vbest = (vr["success"], None, iters)
+        if vbest[1] is not None:
+            ac.load_state_dict(vbest[1])
+        log(f"[{kind}] kept checkpoint of it {vbest[2]} (deterministic validation success {vbest[0]:.3f})")
+        best = (best[0], None, vbest[2])
+    elif best[1] is not None:
         ac.load_state_dict(best[1])  # best training-window checkpoint (training episodes only)
         log(f"[{kind}] kept checkpoint of it {best[2]} (train-success {best[0]:.3f})")
     hist["best_succ"], hist["best_it"] = best[0], best[2]

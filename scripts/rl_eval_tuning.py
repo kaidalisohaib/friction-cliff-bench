@@ -1,6 +1,6 @@
 """Score controllers on the TUNING split for the RL follow-up (D35). Never reads the test split.
 
-Sets: "main" = the reactive-feasible tuning scenarios (prereg A4 labels); "dry" = the same scenarios with the drop
+Sets: "main" = the reactive-feasible scenarios of --split (tuning, or the D35 dev split) (prereg A4 labels); "dry" = the same scenarios with the drop
 removed (mu1 = mu0, dry surface; like eval/runner.py's dry set). Per controller and set the records are written to
 runs/rl_fix/eval/<name>/<set>.jsonl; the summary line (departure on both sets, dry progress relative to O-R = pace
 tax, mean arrival-speed ratio) is appended to runs/rl_fix/eval/summary.jsonl. Engineering numbers, not results.
@@ -27,10 +27,12 @@ from scenarios import sampler as S
 from sim.params import VehicleParams
 
 OUT = Path("runs/rl_fix/eval")
+SPLITS = {"tuning": {}, "dev": {"split_files": ("splits/dev_v1.jsonl",),
+                                "label_files": ("runs/label_dev/labels.jsonl",)}}
 
 
-def sets():
-    scs, rf = tuning_sets()
+def sets(split: str = "tuning"):
+    scs, rf = tuning_sets(**SPLITS[split])
     rf = set(rf)
     main = [s for s in scs if s.sid in rf]
     return {"main": main, "dry": [replace(s, surface="dry", mu1=s.mu0) for s in main]}
@@ -88,8 +90,12 @@ def main():
     ap.add_argument("--ckpt", default="")
     ap.add_argument("--mppi", default="")
     ap.add_argument("--seed", type=int, default=0, help="observation-noise seed for MPPI references")
+    ap.add_argument("--split", default="tuning", choices=list(SPLITS))
     a = ap.parse_args()
-    S_ = sets()
+    global OUT
+    if a.split != "tuning":
+        OUT = Path(f"runs/rl_fix/eval_{a.split}")
+    S_ = sets(a.split)
     snaps = {k: handover(v, cache=OUT / f"handover_{k}.npz") for k, v in S_.items()}
     veff = {s.sid: S.v_eff(s) for s in S_["main"]}
     specs = [x for x in a.mppi.split(",") if x] + [x for x in a.ckpt.split(",") if x]
