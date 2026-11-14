@@ -160,6 +160,54 @@ def markdown(res: dict) -> str:
     return "\n".join(L) + "\n"
 
 
+def tex(res: dict) -> str:
+    """Report fragment (paper/gen/followup.tex); every number from `res`."""
+    M = res["methods"]
+
+    def dep(m):
+        d = M[m]["departure"]
+        return f"{d['estimate']:.4f} [{d['ci95'][0]:.4f}, {d['ci95'][1]:.4f}]"
+
+    def tax(m):
+        t = M[m]["dry_pace_tax"]
+        return f"{100 * t['estimate']:.1f}\\%" if t else "--"
+
+    rows = "\n".join(f"{m} & {len(M[m]['per_seed'])} & {dep(m)} & {tax(m)} & "
+                      f"{min(M[m]['per_seed']):.3f}--{max(M[m]['per_seed']):.3f} \\\\" for m in M)
+    P = ["\\section{Follow-up: a fixed learned policy on fresh test data (A9)}\\label{sec:followup}",
+         f"Test pool v2 (the pre-declared top-up blocks, never used before): $N={res['n_scenarios']:,}$ reactive-feasible "
+         "scenarios; departure with 95\\% hierarchical-bootstrap CIs.",
+         "\\begin{table}[t]\\centering\\small\\begin{tabular}{lcccc}\\toprule method & seeds & departure [95\\% CI] & "
+         "dry pace tax & per-seed range \\\\\\midrule", rows, "\\bottomrule\\end{tabular}"
+         "\\caption{Test v2. P-S2/P-SP2: checkpoints selected by deterministic validation; M-Bc: bank MPPI at the "
+         "pace of P-SP2.}\\label{tab:followup}\\end{table}"]
+    if "H4" in res:
+        h = res["H4"]
+        pdf = h["pace_tax_diff_PSP2_minus_MBc"]
+        P.append((f"\\textbf{{H4 (non-inferiority at matched pace).}} departure(P-SP2) $-$ departure(M-Bc) $=$ "
+                 f"{pp(h['diff_PSP2_minus_MBc'])}, margin {100 * h['margin']:.0f}\\,pp; dry pace tax difference "
+                 + (pp(pdf) if pdf else "--") + ". "
+                 + ("The pace match failed, so H4 is not interpreted." if not h["pace_matched"] else
+                    ("Non-inferiority is shown" if h["non_inferior"] else "Non-inferiority is not shown")
+                    + (" and the learned policy is also superior." if h["superior"] else
+                       "; superiority is not shown.")))
+                 .replace(" pp", "\\,pp"))
+    if "H5" in res:
+        g = res["H5"]["gate"]
+        P.append("\\textbf{H5 (seed reliability).} Gate S2 per seed (departure $\\le$ O-R $+\\,5$\\,pp): "
+                 + "; ".join(f"{m} {v['n_pass']}/{v['n_seeds']}" for m, v in g.items()) + ". "
+                 + ("H5 holds." if res["H5"]["holds"] else "H5 does not hold."))
+    ex = res.get("exploratory", {})
+    parts = []
+    for k, lab in (("P-S_minus_P-S2", "P-S $-$ P-S2"), ("P-S_minus_P-SP2", "P-S $-$ P-SP2"),
+                   ("P-SP_minus_P-SP2", "P-SP $-$ P-SP2")):
+        if k in ex:
+            parts.append(f"{lab}: {pp(ex[k])}".replace(" pp", "\\,pp"))
+    if parts:
+        P.append("\\textbf{Exploratory.} " + "; ".join(parts) + ".")
+    return "\n\n".join(P) + "\n"
+
+
 def main():
     import argparse
     ap = argparse.ArgumentParser()
@@ -170,6 +218,8 @@ def main():
     res = analyze(Path(a.root), top5)
     Path(a.out + ".json").write_text(json.dumps(res, indent=1))
     Path(a.out + ".md").write_text(markdown(res))
+    Path("paper/gen").mkdir(parents=True, exist_ok=True)
+    Path("paper/gen/followup.tex").write_text(tex(res))
     print(markdown(res))
 
 

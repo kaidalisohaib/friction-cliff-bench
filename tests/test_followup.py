@@ -35,6 +35,8 @@ def test_h5_seed_gate_and_exploratory_contrasts(tmp_path):
     assert len(res["methods"]["P-SP2"]["per_seed"]) == 10
     md = F.markdown(res)
     assert "H4" in md and "H5" in md
+    tx = F.tex(res)
+    assert "\\section{Follow-up" in tx and "H4" in tx and "\\\\" in tx and "\\%" in tx
 
 
 def test_h4_non_inferior_at_matched_pace_and_not_when_pace_differs(tmp_path):

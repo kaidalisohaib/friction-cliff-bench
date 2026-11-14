@@ -21,6 +21,9 @@ PYTHONPATH=. uv run python scripts/make_figures.py --root $ROOT --labels labels/
     --split splits/test_v1_T0.jsonl --out docs/results --tex paper/gen
 PYTHONPATH=. uv run python scripts/compute_tex.py
 PYTHONPATH=. uv run python scripts/readme_results.py
+if [ "$(n runs/eval_v2/main jsonl)" -gt 0 ]; then   # follow-up (prereg A9; eval/followup.py)
+    PYTHONPATH=. uv run python -m eval.followup > /dev/null
+fi
 if [ "$(n runs/eval_test/exploratory jsonl)" -gt 0 ]; then   # exploratory E1-E3 (scripts/exploratory.py)
     PYTHONPATH=. uv run python scripts/exploratory.py analyze > /dev/null
 fi

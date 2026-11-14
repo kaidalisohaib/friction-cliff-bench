@@ -81,6 +81,7 @@ def main():
     ap.add_argument("--sets", default="main,dry")
     ap.add_argument("--methods", default=",".join(SEEDS))
     ap.add_argument("--batch", type=int, default=64)
+    ap.add_argument("--seeds", default="", help="seed order override (scheduling only), e.g. 4,3")
     a = ap.parse_args()
     led = json.loads(LEDGER.read_text())
     check_frozen(led)
@@ -92,7 +93,8 @@ def main():
         out.mkdir(parents=True, exist_ok=True)
         snap = handover(scs, tracks, cache=out / "handover.npz")
         for m in a.methods.split(","):
-            for seed in range(SEEDS[m]):
+            order = [int(x) for x in a.seeds.split(",") if x] or list(range(SEEDS[m]))
+            for seed in [s for s in order if s < SEEDS[m]]:
                 path = out / f"{m}_s{seed}.jsonl"
                 if path.exists() and sum(1 for _ in open(path)) == len(scs):
                     continue

@@ -34,6 +34,23 @@ Format per entry: date, phase, hours, what was done, and the verdict for any run
 
 ## Entries
 
+### 2026-11-14 morning: recipe chosen on dev; amendment A9 committed; test v2 started
+- **Dev split, students** (737 RF; engineering numbers):
+  - P-SP2 (preview teacher + validation selection), 10 seeds: every seed reliable. Mean dev pace tax 13.9%.
+  - P-S2 (current-friction teacher + validation selection): catastrophic seeds gone, but one seed still has poor
+    lane keeping on dry road.
+  - The old P-SP was already fairly reliable on dev; most of the P-S → P-SP2 gain comes from the preview teacher.
+  - At matched pace, M-B@c' (c' = 0.744, pace tax 14.0%) departs about as often as P-SP2. → Predict
+    non-inferiority, not superiority (D36).
+- **Selecting on validation return** (the shared objective) instead of success picks earlier, less safe
+  checkpoints. Not adopted.
+- **Reproducibility check:** rerunning the A8 recipe gives bit-identical students for seeds 0 and 1. So P-S is
+  extended to 10 seeds (5–9 new) for a fairer 10-vs-10 comparison.
+- **A9 (a1fcfcb) committed before any v2 labelling.** Test v2 = the pre-declared top-up blocks T1–T3.
+  - H4 is one non-inferiority test; H5 is a per-seed S2 rule.
+  - Analysis code tested with synthetic records (181 tests pass).
+- **Launched:** labelling of T1–T3 (frozen oracles), then the v2 evaluation chain.
+
 ### 2026-11-13/14 night: RL follow-up (D35), diagnosis of the PPO seed failures
 Training library, tuning split and the new dev split only. No test data used. Engineering numbers, not results.
 - **Tools:**
