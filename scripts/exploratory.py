@@ -169,11 +169,11 @@ def analyze(out_md: Path, out_fig: Path, out_tex: Path | None) -> dict:
                   "per_seed": [float(x) for x in np.nanmean(a, axis=1)], "n_scenarios": int(a.shape[1]),
                   "n_runs": int(np.isfinite(a).sum())}
 
-    def diff(x, ref):  # paired x - ref, hierarchical bootstrap
+    def diff(x, ref, pair_seeds=False):  # paired x - ref, hierarchical bootstrap
         if x not in res or ref not in res:
             return None
         dd = St.hier_bootstrap_diff(A.mat(d, x, "departed"), A.mat(d, ref, "departed"), 4000,
-                                    np.random.default_rng(12))
+                                    np.random.default_rng(12), pair_seeds=pair_seeds)
         return A.summary(dd, res[x]["departure"]["estimate"] - res[ref]["departure"]["estimate"])
 
     out = {"variants": res, "diffs": {}}
@@ -189,6 +189,10 @@ def analyze(out_md: Path, out_fig: Path, out_tex: Path | None) -> dict:
                 out["diffs"][f"{m}_K{k} - {ref} (K={TUNED_K})"] = diff(f"{m}_K{k}", ref)
     out["diffs"]["P-S-act - P-S_W12"] = diff("P-S-act", "P-S_W12")
     out["diffs"] = {k: v for k, v in out["diffs"].items() if v is not None}
+    # students of the same teacher seed are paired by seed (added 2026-11-13 after the first analysis showed the
+    # independent-seed intervals to be conservative; reported next to them, not instead of them)
+    out["diffs_seed_paired"] = {k: diff(k.split(" - ")[0], k.split(" - ")[1].split(" ")[0], pair_seeds=True)
+                                for k in out["diffs"] if k.startswith("P-S")}
     write_md(out, out_md)
     write_fig(out, out_fig)
     if out_tex:
@@ -224,6 +228,11 @@ def write_md(out: dict, path: Path) -> None:
         L.append(f"| {k} | {_fmt(r['departure'])} | {', '.join(f'{x:.3f}' for x in r['per_seed'])} |")
     L += ["", "| paired difference | departure [95% CI] |", "|---|---|"]
     L += [f"| {k} | {_pp(v)} |" for k, v in out["diffs"].items()]
+    if out.get("diffs_seed_paired"):
+        L += ["", "Student variants share their teacher's seed, so they are also paired by seed. Resampling seeds "
+              "jointly (added after the first analysis; the independent-seed intervals above stay the reported "
+              "default):", "", "| paired difference (seeds paired) | departure [95% CI] |", "|---|---|"]
+        L += [f"| {k} | {_pp(v)} |" for k, v in out["diffs_seed_paired"].items()]
     path.write_text("\n".join(L) + "\n")
 
 
@@ -298,10 +307,14 @@ def write_tex(out: dict, path: Path) -> None:
         parts.append(f"E3: DAgger action distillation departs {_fmt(r['departure'])} (per seed "
                      f"{', '.join(f'{x:.3f}' for x in r['per_seed'])}); difference to latent regression "
                      f"{_pp(D['P-S-act - P-S_W12'])}.".replace(" pp", "\\,pp"))
-        parts.append(" The student variants share their teachers' seeds, but the bootstrap resamples seeds independently "
-                     "per variant, so the student intervals are conservative. Seed by seed, the pattern repeats: in every "
-                     "student variant the same teacher seed gives the worst student and the same two give the best (table in "
-                     "\\texttt{docs/results/exploratory.md}).")
+        sp = out.get("diffs_seed_paired", {})
+        parts.append(" The student variants share their teachers' seeds, but the bootstrap above resamples seeds "
+                     "independently per variant, so the student intervals are conservative. Seed by seed, the pattern "
+                     "repeats: in every student variant the same teacher seed gives the worst student and the same two "
+                     "give the best."
+                     + (" Resampling seeds jointly (a pairing noted after the first analysis): "
+                        + "; ".join(f"{label(k.split(' - ')[0])}: {_pp(v)}" for k, v in sp.items()).replace(" pp", "\\,pp")
+                        + "." if sp else ""))
     txt = "".join(parts) + "\n\n\\begin{figure}[t]\\centering\\includegraphics[width=\\linewidth]{fig_exploratory.png}" \
         "\\caption{Exploratory E1--E3 on the reactive-feasible test subset.}\\label{fig:fig_exploratory}\\end{figure}\n"
     path.write_text(txt.replace("_", "\\_").replace("\\_exploratory", "_exploratory")

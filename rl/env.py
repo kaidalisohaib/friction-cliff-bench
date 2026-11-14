@@ -188,6 +188,7 @@ class FrictionEnv:
             succ = (self.min_clear >= 0) & (self.loc == 0) & ~term & ~torch.isnan(self.t_drop)
             info = {"rows": torch.nonzero(end).squeeze(1), "success": succ[end], "departed": (self.min_clear < 0)[end],
                     "loc": (self.loc > 0)[end] | term[end], "return": self.ret[end], "lib_idx": self.lib_idx[end],
-                    "min_clear": self.min_clear[end], "progress": None}
+                    "min_clear": self.min_clear[end], "progress": None,
+                    "arrived": ~torch.isnan(self.t_drop[end]), "len_s": t[end], "term": term[end]}
             self._reset(end)
         return rew, end, term & end, info

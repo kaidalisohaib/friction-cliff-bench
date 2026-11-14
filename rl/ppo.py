@@ -104,6 +104,9 @@ class PPOConfig:
     rollback_frac: float = 0.5
     rollback_patience: int = 3
     rollback_max: int = 3
+    # follow-up options (D35); the defaults reproduce the A8 recipe exactly
+    norm_reward: bool = True  # divide rewards by the running std of the discounted return
+    snapshot_every: int = 0  # keep a copy of the weights every this many iterations in hist["snapshots"] (0 = off)
 
 
 def should_rollback(recent: list[float], best: float, frac: float, patience: int) -> bool:
@@ -170,8 +173,9 @@ def train_ppo(kind: str, lib: dict, cfg: PPOConfig, seed: int = 0, device: str =
     disc = torch.zeros(n, device=dev)  # running discounted return per env (reward normalization)
     rstat = [0.0, 1.0, 1e-4]  # mean, var, count of the discounted returns
     best = (-1.0, None, -1)
-    win_s, win_r = [], []
+    win_s, win_r, win_d, upd = [], [], {}, {"kl": [], "clip": [], "sat": [], "ev": []}
     lr_scale, n_rollback, since_best = 1.0, 0, []
+    hist["diag"] = []
     hist["rollbacks"] = []
     t0 = time.time()
     f, pv, pr = _inputs(env)
@@ -193,7 +197,8 @@ def train_ppo(kind: str, lib: dict, cfg: PPOConfig, seed: int = 0, device: str =
                 dlt = bm - m0
                 rstat = [m0 + dlt * bc / tot, (v0 * c0 + bv * bc + dlt ** 2 * c0 * bc / tot) / tot, tot]
                 disc = torch.where(done, torch.zeros_like(disc), disc)
-                r = r / float(np.sqrt(rstat[1]) + 1e-8)
+                if cfg.norm_reward:
+                    r = r / float(np.sqrt(rstat[1]) + 1e-8)
                 if drv is not None and info:
                     drv.mult[done] = 1.0
                 for k, x in zip(("f", "pv", "pr", "a", "logp", "v", "r", "d"), (f, pv, pr, a, logp, v, r, done.float())):
@@ -201,6 +206,8 @@ def train_ppo(kind: str, lib: dict, cfg: PPOConfig, seed: int = 0, device: str =
                 if info:
                     win_s += info["success"].float().tolist()
                     win_r += info["return"].tolist()
+                    for k in ("departed", "arrived", "term", "len_s"):
+                        win_d.setdefault(k, []).extend(info[k].float().tolist())
                 f, pv, pr = _inputs(env)
             v_last = ac.value(f, pv, pr)
         B = {k: torch.stack(v) for k, v in buf.items()}
@@ -213,6 +220,7 @@ def train_ppo(kind: str, lib: dict, cfg: PPOConfig, seed: int = 0, device: str =
             last = delta + cfg.gamma * cfg.lam * nonterm * last
             adv[t] = last
         ret = adv + B["v"]
+        upd["ev"].append(float(1 - (ret - B["v"]).var() / (ret.var() + 1e-8)))
         flat = {k: v.reshape(T * n, *v.shape[2:]) for k, v in B.items()}
         flat["adv"], flat["ret"] = adv.reshape(-1), ret.reshape(-1)
         N = T * n
@@ -232,6 +240,9 @@ def train_ppo(kind: str, lib: dict, cfg: PPOConfig, seed: int = 0, device: str =
                 lr_ = logp - flat["logp"][j]
                 ratio = lr_.exp()
                 kl = float(((ratio - 1) - lr_).mean().detach())
+                upd["kl"].append(kl)
+                upd["clip"].append(float(((ratio - 1).abs() > cfg.clip).float().mean()))
+                upd["sat"].append(float((mu.detach().abs() > 1).float().mean()))
                 if not warm and kl > cfg.target_kl:
                     stop = True
                     break
@@ -256,8 +267,14 @@ def train_ppo(kind: str, lib: dict, cfg: PPOConfig, seed: int = 0, device: str =
             s = float(np.mean(win_s)) if win_s else float("nan")
             rr = float(np.mean(win_r)) if win_r else float("nan")
             hist["iter"].append(it), hist["succ"].append(s), hist["ret"].append(rr), hist["steps"].append((it + 1) * n * T)
+            dg = {k: float(np.mean(v)) for k, v in win_d.items() if v}
+            dg.update({k: float(np.mean(v)) for k, v in upd.items() if v})
+            dg.update({"it": it, "succ": s, "ret": rr, "rstd": float(np.sqrt(rstat[1]))})
+            hist["diag"].append(dg)
             log(f"[{kind}] it {it}/{iters} steps {(it + 1) * n * T / 1e6:.1f}M train-success {s:.3f} return {rr:.1f} "
-                f"std {ac.log_std.exp().tolist()} {time.time() - t0:.0f}s")
+                f"std {[round(x, 4) for x in ac.log_std.exp().tolist()]} {time.time() - t0:.0f}s | "
+                + " ".join(f"{k} {v:.3g}" for k, v in dg.items() if k not in ("it", "succ", "ret")))
+            win_d, upd = {}, {"kl": [], "clip": [], "sat": [], "ev": []}
             if not warm and len(win_s) >= 500 and s > best[0]:
                 best = (s, {k: v.detach().clone() for k, v in ac.state_dict().items()}, it)
                 since_best = []
@@ -275,6 +292,8 @@ def train_ppo(kind: str, lib: dict, cfg: PPOConfig, seed: int = 0, device: str =
                     log(f"[{kind}] collapse rollback {n_rollback} at it {it} to it {best[2]} "
                         f"(success {s:.3f} < {cfg.rollback_frac} x {best[0]:.3f}); actor lr x{lr_scale}")
             win_s, win_r = [], []
+        if cfg.snapshot_every and it % cfg.snapshot_every == 0:
+            hist.setdefault("snapshots", {})[it] = {k: v.detach().cpu().clone() for k, v in ac.state_dict().items()}
         if time_budget_s and time.time() - t0 > time_budget_s:
             log(f"[{kind}] time budget reached at it {it}")
             break

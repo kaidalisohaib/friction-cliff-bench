@@ -51,3 +51,16 @@ def test_p_value_tost_and_holm():
     assert not tost(rng.normal(0.04, 0.01, 20000), 0.05)["equivalent"]
     assert holm({"H1": 0.01, "H2": 0.04, "H3": 0.02}) == {"H1": True, "H2": True, "H3": True}
     assert holm({"H1": 0.01, "H2": 0.04, "H3": 0.026}) == {"H1": True, "H3": False, "H2": False}
+
+
+def test_hier_bootstrap_diff_pair_seeds_removes_shared_seed_variance():
+    import numpy as np
+    from eval.stats import ci, hier_bootstrap_diff
+    rng = np.random.default_rng(0)
+    seed_eff = np.array([0.0, 0.03, 0.15, 0.05, 0.7])[:, None]  # large shared seed effect
+    b = np.clip(seed_eff + rng.normal(0, 0.01, (5, 400)), 0, 1)
+    a = b + 0.01  # A is B plus a constant
+    ind = ci(hier_bootstrap_diff(a, b, 2000, np.random.default_rng(1)))
+    par = ci(hier_bootstrap_diff(a, b, 2000, np.random.default_rng(1), pair_seeds=True))
+    assert par[1] - par[0] < 0.1 * (ind[1] - ind[0])
+    assert par[0] - 1e-9 <= 0.01 <= par[1] + 1e-9

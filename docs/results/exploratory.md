@@ -38,3 +38,12 @@ Pre-declared 500-scenario reactive-feasible test subset (N = 500 scenarios × 5 
 | M-L_K256 - M-L_W5 (K=1024) | -0.2 pp [-1.5, +1.2] |
 | M-L_K4096 - M-L_W5 (K=1024) | -0.1 pp [-1.8, +1.7] |
 | P-S-act - P-S_W12 | -1.7 pp [-30.5, +26.7] |
+
+Student variants share their teacher's seed, so they are also paired by seed. Resampling seeds jointly (added after the first analysis; the independent-seed intervals above stay the reported default):
+
+| paired difference (seeds paired) | departure [95% CI] |
+|---|---|
+| P-S_W5 - P-S_W12 | -0.1 pp [-1.7, +1.4] |
+| P-S_W25 - P-S_W12 | -0.5 pp [-2.0, +0.9] |
+| P-S_W50 - P-S_W12 | -0.2 pp [-1.1, +0.8] |
+| P-S-act - P-S_W12 | -1.7 pp [-5.3, +0.2] |

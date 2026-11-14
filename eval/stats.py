@@ -28,22 +28,27 @@ def wilson(k: int, n: int, z: float = Z95) -> tuple[float, float]:
     return (max(0.0, c - h), min(1.0, c + h))
 
 
-def hier_bootstrap_diff(a: np.ndarray, b: np.ndarray, n_boot: int = 10_000, rng=None) -> np.ndarray:
+def hier_bootstrap_diff(a: np.ndarray, b: np.ndarray, n_boot: int = 10_000, rng=None,
+                        pair_seeds: bool = False) -> np.ndarray:
     """Bootstrap distribution of mean(a) - mean(b) for paired arrays of shape (seeds, scenarios).
 
     a[i, j], b[i, j]: metric of method A / B, training seed i, scenario j (same scenario instance). If the two
     methods have different seed counts, pass them separately with b of shape (seeds_b, scenarios); seeds are
     resampled independently per method, scenarios jointly (that keeps the pairing).
+    pair_seeds=True: seed i of A and seed i of B share a training input (e.g. two students of the same teacher
+    seed), so seeds are resampled jointly too. Needs equal seed counts.
     """
     rng = np.random.default_rng(0) if rng is None else rng
     a = np.atleast_2d(np.asarray(a, float))
     b = np.atleast_2d(np.asarray(b, float))
     assert a.shape[1] == b.shape[1], "paired: same scenarios"
     n_sc = a.shape[1]
+    if pair_seeds:
+        assert a.shape[0] == b.shape[0], "pair_seeds: same seed count"
     out = np.empty(n_boot)
     for t in range(n_boot):
         ia = rng.integers(0, a.shape[0], a.shape[0])
-        ib = rng.integers(0, b.shape[0], b.shape[0])
+        ib = ia if pair_seeds else rng.integers(0, b.shape[0], b.shape[0])
         js = rng.integers(0, n_sc, n_sc)
         out[t] = a[ia][:, js].mean() - b[ib][:, js].mean()
     return out

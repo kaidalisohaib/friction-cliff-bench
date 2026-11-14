@@ -348,3 +348,16 @@ What A5 adds to V6/V7/EVAL_PROTOCOL and why:
   - Making the noise per car would change the noise realisations relative to tuning. It would also mean editing
     controller code just before the test run, for no gain in validity.
 - **Write-up:** the reproducibility statement names the batch size.
+
+## D35: RL follow-up phase: diagnose and fix PPO training on training/tuning data only, then a pre-registered re-test on a fresh pool (A9). DECIDED 2026-11-13
+- **Goal:** improve the learned arm, so that the RL result is a solved problem rather than an
+  unstable one.
+- **What the confirmatory record already holds:** H1–H3 and E1–E7 on test v1 stand as reported. Nothing in this
+  phase changes or re-analyses them.
+- **Rules for this phase:**
+  - diagnosis and recipe work use only the training library and the tuning split (`scripts/rl_diag.py`,
+    `scripts/rl_eval_tuning.py`; outputs in `runs/rl_fix/`);
+  - test v1 is never used again for a decision;
+  - a new claim needs amendment A9: hypotheses, recipe, comparator and a fresh test pool (v2). A9 is committed
+    before any v2 evaluation; it is tagged `prereg-v2`.
+- **Parity:** extra engineering on the RL arm is logged. The MPPI arm gets the matching extra budget under A9.
