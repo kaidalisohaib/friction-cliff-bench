@@ -134,6 +134,43 @@ Confirmatory test split: 4,000 scenarios, 3,009 of them reactive-feasible, 5 see
 - **H5** (P-SP2): all 10 training seeds pass the per-seed reliability gate (P-S 8/10; P-SP 5/5; P-S2 9/10; P-SP2 10/10).
 <!-- RESULTS:END -->
 
+## Figures
+All figures are generated from the run logs by `scripts/report/finalize.sh`.
+
+**What is physically possible.** Feasibility class of every test scenario, by post-drop surface and patch length
+(top) and by curve radius and speed (bottom). Ice, long patches, tight curves and high speed make preview necessary
+or the car unsaveable.
+
+![Feasibility classes of the 4,000 test scenarios](docs/figures/labels_test_T0.png)
+
+**Who leaves the lane, per class.** Departure rate of every method in each feasibility class, with 95% CIs. Only the
+reactive-feasible group (left) is used to rank controllers; the others show what the labels predict.
+
+![Departure rate by feasibility class](docs/results/fig_departure_by_class.png)
+
+**Adaptation or caution?** Left: departure against mean arrival speed at the friction drop. The learned policies
+arrive slower; the bank MPPI slowed to the student's speed (M-B-c) is the safest non-oracle method. Right: departure
+within arrival-speed bins.
+
+![Departure against arrival speed](docs/results/fig_caution.png)
+
+**What the adaptive planners believe.** The model-bank MPPI's friction estimate catches the drop within a fraction
+of a second; the learned estimator stays too optimistic for more than a second.
+
+![Friction belief around the drop](docs/results/fig_mechanism.png)
+
+**Follow-up (A9).** Left: departure of every training seed on the fresh test pool; the repaired policies (orange)
+all sit below the reliability gate. Right: departure against dry-road pace; at matched pace the repaired student
+and the slowed bank MPPI overlap.
+
+![Follow-up on test pool v2](docs/results/fig_followup.png)
+
+More: [H1 interval](docs/results/fig_h1.png), [model mismatch (H2)](docs/results/fig_h2.png),
+[per-cell regime map](docs/results/fig_regime_map.png), [exploratory E1–E3](docs/results/fig_exploratory.png),
+[analytic feasibility map](docs/figures/feasibility_map.png),
+[understeer vs real cars](docs/results/grounding/comma_understeer.png),
+[friction levels vs road sensors](docs/results/grounding/marwis.png).
+
 ## Limitations
 Simulation only, with a planar single-track model; one vehicle; friction changes along the lane only. Tuning,
 training and evaluation run on one laptop GPU, which bounds the scenario counts and the number of training seeds.
