@@ -44,7 +44,7 @@ a physics or consistency argument, **E** = engineering choice (no single source;
 ## 4. Tires and handling (D15)
 | Param | Value | Why / source | Conf. |
 |---|---|---|---|
-| Longitudinal (Bx, Cx, Ex) per surface | `sim/params.py` | Least-squares fit to Burckhardt (1993) μ-slip curves (`scripts/fit_surfaces.py`, max error ≈ 3% of peak) | S |
+| Longitudinal (Bx, Cx, Ex) per surface | `sim/params.py` | Least-squares fit to Burckhardt (1993) μ-slip curves (`scripts/setup/fit_surfaces.py`, max error ≈ 3% of peak) | S |
 | Lateral dry/wet (By, Cy, Ey) | `sim/params.py` | Pacejka's typical lateral shape C = 1.3, cornering stiffness C_α/Fz = 17 /rad, peak at 7° / 6° | S |
 | Lateral snow/ice | `sim/params.py` | CRREL winter-surface measurements: ice peaks at 2–4° then drops (C = 1.6, peak 3°); snow keeps rising to ≈ 15° (C = 1.0) | S |
 | μ ranges | dry 0.85–1.0, wet 0.5–0.8, snow 0.20–0.35, ice 0.08–0.15 | prereg V7 (frozen at the tag); WSPI statistics appear in an appendix only (P5) | S |
@@ -93,4 +93,4 @@ into a dated amendment together with the oracle settings before any test-split u
   https://image-ppubs.uspto.gov/dirsearch-public/print/downloadPdf/9969425
 - Tire inertia measurements: Metz et al., SAE 900760, https://saemobilus.sae.org/papers/moments-inertia-mounted-unmounted-passenger-car-motorcycle-tires-900760
 - Tire shapes: Burckhardt (1993); Pacejka, *Tire and Vehicle Dynamics*; CRREL winter-tire reports (see D15 and
-  `scripts/fit_surfaces.py`).
+  `scripts/setup/fit_surfaces.py`).

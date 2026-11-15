@@ -19,7 +19,7 @@ from sim.warp_sim import ScenarioSim, surface_vec
 
 MU_NOMINAL_DRY = 0.5 * sum(MU_RANGES["dry"])
 
-# Oracle settings chosen on the tuning split (D21, PROPOSED; frozen by prereg A4 once approved)
+# Oracle settings chosen on the tuning split (D21; frozen by prereg A4)
 ORACLE_OR = MPPIConfig(K=1024, H=150, sigma_steer=0.05, sigma_long=0.3, lam=10.0, rho=0.0, pd_sample=True)
 ORACLE_OC = MPPIConfig(K=1024, H=150, sigma_steer=0.05, sigma_long=0.3, lam=10.0, rho=0.9, pd_sample=True,
                        mode=MODE_FIELD)

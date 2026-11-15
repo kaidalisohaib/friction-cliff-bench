@@ -1,8 +1,8 @@
-"""MARWIS summary on synthetic logs with known values (scripts/wspi_marwis.py)."""
+"""MARWIS summary on synthetic logs with known values (scripts/report/wspi_marwis.py)."""
 
 import numpy as np
 
-from scripts import wspi_marwis as W
+from scripts.report import wspi_marwis as W
 from sim.params import MU_RANGES
 
 

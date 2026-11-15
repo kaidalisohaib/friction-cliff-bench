@@ -1,7 +1,7 @@
 """Confirmatory analysis (prereg H1-H3 as specified in V6 and amendment A5; EVAL_PROTOCOL §3-4).
 
 Reads the run logs of eval/runner.py and writes one JSON with every number plus Markdown tables. Figures:
-scripts/make_figures.py. Nothing here chooses anything after looking at test outcomes, except "the better of
+scripts/report/make_figures.py. Nothing here chooses anything after looking at test outcomes, except "the better of
 M-B / M-L" (lower pooled reactive-feasible departure), which is the conservative choice for the H1 falsifier
 (prereg A5.3).
 

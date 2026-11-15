@@ -1,6 +1,6 @@
 """Analysis of the RL follow-up (prereg amendment A9, D36) on test pool v2 (the pre-declared top-up blocks T1–T3).
 
-Inputs: run records (scripts/eval_v2.py) under <root>/{main,dry}/<method>_s<seed>.jsonl, every method on the same
+Inputs: run records (scripts/evaluate/eval_v2.py) under <root>/{main,dry}/<method>_s<seed>.jsonl, every method on the same
 reactive-feasible v2 scenarios in the same order. Departure is the H1 metric; dry pace tax = 1 − mean dry progress
 / mean dry progress of O-R (as in eval/analysis.py). Intervals: hierarchical bootstrap (scenarios jointly, seeds per
 method), 95%.
@@ -260,7 +260,7 @@ def abstract_tex(res: dict) -> str:
 
 
 def readme_lines(res: dict) -> list[str]:
-    """README follow-up block (scripts/readme_results.py); every number from `res`."""
+    """README follow-up block (scripts/report/readme_results.py); every number from `res`."""
     if "H4" not in res:
         return []
     M = res["methods"]

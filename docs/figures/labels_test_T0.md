@@ -1,6 +1,6 @@
 # Feasibility classes: test_T0
 
-Harness output (`scripts/fig_labels.py`), N = 4000 scenarios.
+Harness output (`scripts/report/fig_labels.py`), N = 4000 scenarios.
 
 | class | n | share | Wilson 95% |
 |---|---|---|---|

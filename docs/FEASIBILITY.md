@@ -32,7 +32,7 @@ trajectory with that acceleration bound keeps the CoG inside the corridor shrunk
 half-width, the scenario is infeasible for the full model. This is a necessary condition. It can certify
 infeasibility but never feasibility.
 
-**Computing it (⚠ choose in P1, in this order of preference):**
+**Computing it (options in order of preference; P1 implemented option 1, the closed-form bound):**
 1. **Closed-form bound** for the dominant case (constant curvature κ across a patch longer than the escape
    distance): the best achievable lateral deviation under |a| ≤ μ1·g given entry speed v0. Derive it, prove that it
    is a bound, and unit-test it against brute-force point-mass optimization.
@@ -110,7 +110,7 @@ form of reactive infeasibility); (b) check S1 per oracle run at that run's *actu
 (speed, |e|, |ė|), which is sharp and sound for both oracles; (c) O-C successes in certified scenarios are
 expected (pre-braking) and are reported, not treated as bugs. The prereg's S1 wording ("no oracle succeeds in a
 certified-infeasible scenario") would be refined by a dated amendment before any test-split labelling.
-**Update 2026-11-08:** approved; adopted as prereg amendment A3, which also fixes the label
+**Update 2026-11-08:** adopted as prereg amendment A3, which also fixes the label
 precedence (reactive-feasible > preview-required > certified-infeasible > undetermined) and the
 *certified-reactive-infeasible* flag.
 

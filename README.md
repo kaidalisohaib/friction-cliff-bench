@@ -1,69 +1,73 @@
 # Friction-Cliff-Bench
 
-**When the road suddenly turns to ice, can a learned policy that adapts from its own history keep a car on the
-road better than an adaptive model-predictive controller, under equal information and an equal tuning budget?**
-And in which scenarios can *nothing* save the car?
+When the road suddenly turns to ice, can a learned policy that adapts from its own history keep a car in its lane
+better than an adaptive model-predictive controller, with the same information and the same tuning budget? And in
+which scenarios can nothing save the car?
 
 ![Two MPPI controllers on a tuning scenario where the curve entry turns to ice. Left: the planner assumes dry road; its sampled plans (orange) curve sharply and the car spins off. Right: the planner is told the current friction and stays in lane.](docs/media/hero.gif)
 
 *Tuning scenario, not a result. Orange lines are the planner's sampled plans, simulated with the planner's own
 friction model: the friction-blind planner keeps believing it can turn.*
 
-**Status (Nov 2026):** complete. The 4,000-scenario test split was labelled and frozen
-([class breakdown](docs/figures/labels_test_T0.md)), every method was tuned under the logged budget and trained with
-5 seeds, and the confirmatory evaluation is done: see [Results](#results) and the
-[technical report](paper/main.tex) (`cd paper && tectonic main.tex`). **In short:** under matched information and
-budget, the RMA student did not beat the bank-adaptive MPPI. Its five training seeds ranged from excellent to failing,
-and much of the apparent robustness to a friction drop comes from slowing down early. A pre-registered follow-up
-(amendment A9) traced the seed instability to checkpoint selection (training kept checkpoints by noisy training
-success, but the policy is deployed without noise), fixed it, and re-tested on fresh scenarios: the repaired
-preview-teacher student passed the reliability gate on every training seed and was non-inferior to the bank MPPI at
-matched pace, though not better ([follow-up results](#results)). The protocol was
-[pre-registered](docs/PREREGISTRATION.md) (`prereg-v1`) before any test scenario was labelled or evaluated; later
-changes are dated amendments.
+This is a simulation benchmark for car control under abrupt tire–road friction loss (dry to wet, snow or ice). It
+compares an RMA-style PPO policy with adaptive MPPI and with known-friction oracles. Every scenario is first labelled
+by what is physically possible, and the hypotheses, metrics and statistics were pre-registered before any test
+scenario was labelled. The confirmatory runs use my own C++17/CUDA MPPI. The full write-up is the
+[technical report](paper/main.tex) (`cd paper && tectonic main.tex`).
 
-## What it is
-A benchmark of vehicle control under **abrupt tire–road friction loss** (dry → wet / snow / ice), built so that the
-comparison cannot quietly favour one side:
+## Findings
+- **Under parity, the learned policy did not beat the model-bank MPPI.** The point estimate favours the MPPI, and the
+  interval is wide because the PPO training seeds ranged from excellent to failing.
+- **Much of the apparent robustness is slowing down.** The trained policies reach the friction drop well below the
+  reference speed. The bank MPPI driven at the same speed is at least as safe, and the dry-road pace tax prices that
+  caution.
+- **The seed instability had a specific cause.** Training kept checkpoints by success under exploration noise, but
+  the policy is deployed without noise. Selecting checkpoints on noiseless held-out validation fixed it. In a second
+  pre-registered test on fresh scenarios (amendment A9), every seed of the repaired policy passed the reliability
+  gate, and at matched speed it was non-inferior to the bank MPPI, though not better.
+- **Model mismatch did not hurt the bank MPPI** on any of the three tested axes, contrary to my prediction (H2).
+- **Labels change the ranking.** Where only a preview of the road ahead can save the car, reactive controllers
+  nearly always fail. A pooled failure rate over all scenarios mostly measures the scenario mix.
 
-1. **Every scenario is labelled by what is physically possible.** A friction-circle certificate proves when no
-   controller can stay in lane; oracle controllers that know the true friction show when recovery *is* possible,
-   and whether it needs a preview of the road ahead. Classes: reactive-feasible, preview-required,
-   certified-infeasible, undetermined. Controllers are only ranked where saving the car is possible.
-2. **The contenders, with matched information and an equal, logged tuning budget:**
-   - adaptive MPPI with a **model bank** (LLA-MPC style) or a **learned friction estimator**;
-   - an **RMA-style teacher → student PPO** policy (the teacher sees friction; the student infers it from history);
-   - a domain-randomized PPO policy, and a student of a teacher that previews the road ahead (H3).
-3. **Known-friction oracles** (reactive and clairvoyant MPPI) give the regret reference on every scenario.
-4. **Confirmatory runs use our own C++17/CUDA MPPI**, checked against the reference implementation.
+All numbers, with N and 95% intervals, are in [Results](#results). They are written by the evaluation harness,
+not by hand.
 
-The intended output is a regime map: *where each method wins, where nobody can win, and why*. Not "RL beats MPC".
+## How it works
+1. **Feasibility labels.** A friction-circle certificate proves when no controller can stay in the lane. Oracle MPPI
+   controllers that know the true friction show when recovery is possible and whether it needs a preview of the road
+   ahead. Classes: reactive-feasible, preview-required, certified-infeasible, undetermined. Controllers are ranked
+   only where the car can be saved.
+2. **Matched contenders.** Adaptive MPPI with a model bank (LLA-MPC style) or a learned friction estimator; an
+   RMA-style teacher–student PPO policy (the teacher sees friction, the student infers it from history); a
+   domain-randomised PPO policy; and a student of a teacher that previews the road ahead. All share one objective,
+   one observation history and an equal, logged tuning budget.
+3. **Oracles** give the regret reference on every scenario.
+4. **Pre-registration.** Hypotheses H1–H3 with falsifiers, the scenario sampler and seeds, the tuning budget, the
+   oracle settings and the statistics (hierarchical bootstrap, TOST at ±5 pp, Holm) are in
+   [`docs/PREREGISTRATION.md`](docs/PREREGISTRATION.md). Later changes are dated amendments (A1–A9) with reasons in
+   [`docs/DECISIONS.md`](docs/DECISIONS.md).
 
-## How it is built
+Verification habits: simulator physics written test-first and cross-checked against an independent float64 model;
+the C++ MPPI reproduces Warp's random number generator bit for bit, so both implementations draw the same samples
+and are compared on whole control steps; frozen values (parameters, splits, oracle settings) are fingerprinted in
+CI; tuning trials and GPU-hours are logged per method.
+
+## Repository layout
 ```
 sim/          GPU vehicle simulator in NVIDIA Warp: dynamic bicycle, combined-slip Pacejka tires, wheel spin,
               relaxation, actuator lag/delay, per-axle friction fields; float64 NumPy reference model
 scenarios/    tracks (straight, clothoid curves R 50-400 m), scenario sampler, frozen hashed splits
 feasibility/  analytic friction-circle certificate (soundness argument in docs/FEASIBILITY.md)
-labelling/    oracle labelling + sanity gate S1
+labelling/    oracle labelling and sanity gate S1
 control/      batched Warp MPPI, oracles, model-bank and learned-estimator MPPI, C++ backend binding
-rl/           GPU RL environment, PPO teacher / RMA student / DR policy, training library
+rl/           GPU RL environment, PPO teacher, RMA student, DR policy, training library
 mppi_cpp/     C++17/CUDA MPPI: __host__ __device__ dynamics and MPPI kernels, CPU + CUDA drivers, GoogleTest
 eval/         episode runner, tuning harness with budget ledger, evaluation runner, statistics, analysis
-scripts/      labelling, tuning, training, gates, benchmarks, figures
-tests/        pytest suite (simulator vs reference, certificate soundness, MPPI, RL env, statistics, C++ equivalence)
+scripts/      setup/ (splits, labels, libraries), train/, evaluate/, report/ (figures, tables, finalize.sh), bench/
+tests/        pytest suite: simulator vs reference, certificate soundness, MPPI, RL env, statistics, C++ equivalence
+splits/ labels/ ledgers/   frozen scenario sets, oracle labels, tuning ledger and hash ledgers
+paper/        technical report (LaTeX); paper/gen/ is written by the harness
 ```
-
-**Verification habits:** simulator physics written test-first and cross-checked against an independent float64
-model; the C++ MPPI reproduces Warp's random number generator bit for bit, so both implementations draw the same
-samples and are compared on whole control steps (gate S3); frozen values (parameters, splits, oracle settings) are
-fingerprinted in CI; tuning trials and GPU-hours are logged per method.
-
-## What is pre-registered
-Hypotheses H1–H3 with falsifiers, metrics and statistics (hierarchical bootstrap, TOST at a ±5 pp margin, Holm),
-the scenario sampler and seeds, the tuning budget, the oracle settings, and the evaluation plan. See
-[`docs/PREREGISTRATION.md`](docs/PREREGISTRATION.md); every later change is a dated amendment (A1–A8) with its
-reason in [`docs/DECISIONS.md`](docs/DECISIONS.md).
 
 ## Run it
 ```bash
@@ -72,14 +76,17 @@ uv run pytest -q                          # fast suite (GPU tests need a CUDA de
 cmake -S mppi_cpp -B mppi_cpp/build -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc
 cmake --build mppi_cpp/build -j && ./mppi_cpp/build/fcb_tests      # GoogleTest
 MPPI_BACKEND=cpp PYTHONPATH=. uv run pytest -q tests/test_mppi_cpp.py   # C++ vs Warp equivalence
+bash scripts/report/finalize.sh           # regenerate every table, figure and report fragment from the run logs
 ```
+The evaluation itself (`scripts/evaluate/eval_split.py`, `scripts/evaluate/eval_v2.py`) takes more than a day on one
+laptop GPU; run logs go to `runs/` (not in the repository).
 
 ## Grounding against real cars
 The simulated car's steady-state understeer is compared with ten passenger-car platforms from openpilot driving logs
 ([commaSteeringControl](https://huggingface.co/datasets/commaai/commaSteeringControl), MIT). The steering ratio is
-fitted, not assumed. Script, table and figure: [`docs/results/grounding/`](docs/results/grounding/comma_understeer.md).
-The scenario friction levels are compared with road-weather sensor logs from winter drives at Mcity (MARWIS, part
-of [MCity-WSPI](https://huggingface.co/datasets/AD-Assurance-Lab/winter-driving-dataset), CC-BY-4.0):
+fitted, not assumed: [`docs/results/grounding/`](docs/results/grounding/comma_understeer.md). The scenario friction
+levels are compared with road-weather sensor logs from winter drives at Mcity (MARWIS, part of
+[MCity-WSPI](https://huggingface.co/datasets/AD-Assurance-Lab/winter-driving-dataset), CC-BY-4.0):
 [`docs/results/grounding/marwis.md`](docs/results/grounding/marwis.md).
 
 ## Results
@@ -127,19 +134,21 @@ Confirmatory test split: 4,000 scenarios, 3,009 of them reactive-feasible, 5 see
 - **H5** (P-SP2): all 10 training seeds pass the per-seed reliability gate (P-S 8/10; P-SP 5/5; P-S2 9/10; P-SP2 10/10).
 <!-- RESULTS:END -->
 
-## Limitations (by design)
-Simulation only, with a planar single-track (bicycle) model; one vehicle; friction drops along the lane only.
-Tuning, training and the benchmark run on one laptop GPU.
+## Limitations
+Simulation only, with a planar single-track model; one vehicle; friction changes along the lane only. Tuning,
+training and evaluation run on one laptop GPU, which bounds the scenario counts and the number of training seeds.
+The technical report lists the rest.
 
 ## Documents
 | File | Contents |
 |---|---|
 | [`docs/DESIGN.md`](docs/DESIGN.md) | Vehicle model, tracks, scenario space, shared objective, simulator validation |
-| [`docs/PARAMETERS.md`](docs/PARAMETERS.md) | Source and plausible range of every vehicle/tire value |
+| [`docs/PARAMETERS.md`](docs/PARAMETERS.md) | Source and plausible range of every vehicle and tire value |
 | [`docs/FEASIBILITY.md`](docs/FEASIBILITY.md) | Labels, the certificate and its soundness argument, oracles, gate S1 |
-| [`docs/BASELINES.md`](docs/BASELINES.md) | Controller set, fairness checklist, MPPI / RL / C++ specs |
+| [`docs/BASELINES.md`](docs/BASELINES.md) | Controller set, fairness checklist, MPPI, RL and C++ specs |
 | [`docs/EVAL_PROTOCOL.md`](docs/EVAL_PROTOCOL.md) | Metrics, splits, seeds, statistics, reporting rules |
-| [`docs/PREREGISTRATION.md`](docs/PREREGISTRATION.md) | Research questions, hypotheses, gates, amendments |
+| [`docs/PREREGISTRATION.md`](docs/PREREGISTRATION.md) | Research questions, hypotheses, gates, amendments A1–A9 |
 | [`docs/RELATED_WORK.md`](docs/RELATED_WORK.md) | Closest work and how this differs |
-| [`docs/DECISIONS.md`](docs/DECISIONS.md) | Dated design decisions and why |
-| [`docs/LOG.md`](docs/LOG.md) | Dated notebook, run verdicts, tuning ledger |
+| [`docs/DECISIONS.md`](docs/DECISIONS.md) | Dated design decisions and their reasons |
+| [`docs/LOG.md`](docs/LOG.md) | Dated lab notebook: run verdicts, tuning ledger, incidents |
+| [`docs/results/`](docs/results/) | Harness output: results, follow-up, exploratory, compute, grounding |

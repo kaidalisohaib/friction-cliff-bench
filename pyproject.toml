@@ -1,6 +1,6 @@
 [project]
 name = "friction-cliff-bench"
-version = "0.0.0"
+version = "1.0.0"
 description = "Feasibility-audited, parity-controlled benchmark of car control under sudden tire-road friction loss"
 requires-python = ">=3.12,<3.13"
 dependencies = [

@@ -1,7 +1,7 @@
 % Friction-Cliff-Bench technical report.
 % Build: cd paper && tectonic main.tex
-% Every number in a results section is \input from files that scripts/make_figures.py and
-% scripts/grounding_comma.py generate from the raw run logs (rule: no numbers without N and a CI).
+% Every number in a results section is \input from files that scripts/report/make_figures.py and
+% scripts/report/grounding_comma.py generate from the raw run logs (rule: no numbers without N and a CI).
 \documentclass[11pt]{article}
 \usepackage[margin=1in]{geometry}
 \usepackage{amsmath,amssymb}
@@ -19,7 +19,7 @@
 \title{Friction-Cliff-Bench: a feasibility-audited, parity-controlled benchmark of\\
 car control under sudden tire--road friction loss}
 \author{Sohaib Kaidali\\McGill University}
-\date{Technical report, draft of \today}
+\date{Technical report, November 2026}
 
 \begin{document}
 \maketitle
@@ -213,9 +213,9 @@ compiler-dependent fused multiply-add placement, so confirmatory runs use one ba
 \section{Discussion}\label{sec:discussion}
 \textbf{No learned win under parity.} The pre-registered falsifier of H1 is not met: with the same observations,
 the same objective and the same logged tuning budget, the RMA student does not depart less than the bank-adaptive
-MPPI. The point estimate favours the MPPI, but equivalence is not shown either, because the interval is wide. This
-does not mean ``MPC beats RL''. It means that under parity the claim that a learned policy adapts better does not
-survive, and the protocol could have shown the opposite.
+MPPI. The point estimate favours the MPPI, but equivalence is not shown either, because the interval is wide. The
+result is narrower than ``MPC beats RL'': under parity, the claim that a learned policy adapts better does not
+survive, and the protocol was able to show the opposite.
 
 \textbf{Seed reliability is the result.} The interval is wide because training seeds of one configuration produce
 very different policies (Table~\ref{tab:seeds}). The best student seed departs less than every MPPI without preview. The worst also

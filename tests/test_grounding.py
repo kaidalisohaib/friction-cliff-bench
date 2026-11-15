@@ -1,10 +1,10 @@
-"""The understeer fit of scripts/grounding_comma.py recovers a known steering ratio and gradient."""
+"""The understeer fit of scripts/report/grounding_comma.py recovers a known steering ratio and gradient."""
 
 import math
 
 import numpy as np
 
-from scripts.grounding_comma import fit, sim_fit
+from scripts.report.grounding_comma import fit, sim_fit
 from sim.params import G, VehicleParams
 
 

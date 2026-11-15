@@ -1,4 +1,4 @@
-# Learned-policy latency per control step (harness output of `scripts/bench_policy.py`)
+# Learned-policy latency per control step (harness output of `scripts/bench/bench_policy.py`)
 
 Student (GRU over W = 12 feature vectors + MLP actor), `runs/rl_fix/stu_tpval_s0.pt`. Median and 2.5–97.5% range of N = 300 timed calls; GPU shared during the run: True.
 

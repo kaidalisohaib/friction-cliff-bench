@@ -104,7 +104,7 @@ class PPOConfig:
     rollback_frac: float = 0.5
     rollback_patience: int = 3
     rollback_max: int = 3
-    # follow-up options (D35); the defaults reproduce the A8 recipe exactly
+    # follow-up options (D35, prereg A9); the defaults reproduce the A8 recipe exactly
     norm_reward: bool = True  # divide rewards by the running std of the discounted return
     snapshot_every: int = 0  # keep a copy of the weights every this many iterations in hist["snapshots"] (0 = off)
     bound_coef: float = 0.0  # weight of a penalty on the actor mean outside [-1, 1] (mean of relu(|mu| - 1)^2)

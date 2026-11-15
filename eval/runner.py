@@ -82,7 +82,7 @@ def scenario_set(set_name: str, split_files, label_files, limit: int = 0) -> lis
     scs = [sc for f in split_files for sc in S.load_jsonl(f)[1]]
     labels = load_labels(label_files)
     scs = [sc for sc in scs if sc.sid in labels]
-    if limit:  # pipeline dry runs on the tuning split only (refused for test by scripts/eval_split.py)
+    if limit:  # pipeline dry runs on the tuning split only (refused for test by scripts/evaluate/eval_split.py)
         scs = scs[:limit]
     if set_name == "main":
         return scs

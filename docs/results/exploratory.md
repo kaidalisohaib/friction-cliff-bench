@@ -1,4 +1,4 @@
-# Exploratory E1-E3 (harness output of `scripts/exploratory.py`)
+# Exploratory E1-E3 (harness output of `scripts/evaluate/exploratory.py`)
 
 Pre-declared 500-scenario reactive-feasible test subset (N = 500 scenarios × 5 seeds), nominal truth. Departure rate with a hierarchical-bootstrap 95% CI; differences are paired against the tuned setting. Exploratory: outside the Holm family, nothing tuned on these results.
 

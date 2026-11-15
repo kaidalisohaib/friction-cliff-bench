@@ -1,4 +1,4 @@
-# MARWIS friction proxy vs simulator mu ranges (harness output of `scripts/wspi_marwis.py`)
+# MARWIS friction proxy vs simulator mu ranges (harness output of `scripts/report/wspi_marwis.py`)
 
 MARWIS reports an optical grip proxy (0.82 = dry), not tire peak friction; compare ratios to dry. Medians with 95% cluster-bootstrap CIs over drives.
 

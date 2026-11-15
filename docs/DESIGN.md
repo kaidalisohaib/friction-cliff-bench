@@ -1,9 +1,8 @@
 # DESIGN: simulator, tracks, scenarios, shared task objective
 
-Status: **design spec, pre-implementation.** Parameter values are *initial*: they must be justified with a
-source (or a sanity check) in P1 and frozen by a dated prereg amendment at G1, before any test-split
-labelling (D13). Anything marked ⚠ is an open choice.
-**Update 2026-11-08:** simulator implemented (P1); parameters sourced in `PARAMETERS.md` and frozen by prereg A1.
+Written as the design spec before implementation (2026-10-14). The simulator was implemented in P1; its parameters
+are sourced in `PARAMETERS.md` and were frozen by prereg amendment A1 at G1 (2026-11-08), before any test-split
+labelling (D13).
 
 ---
 
@@ -46,8 +45,8 @@ plough), and (b) offer *structural* mismatch axes for H2.
   (zero-crossing clamp).
 - **Actuators:** steering first-order lag τδ + rate limit + saturation; longitudinal first-order lag τT; pure
   delay of `d` control steps (DR / mismatch axis).
-- **Integration:** semi-implicit Euler, physics dt = 1 ms, 20 substeps per 20 ms control step. ⚠ Confirm stability
-  of the wheel-spin states at dt = 1 ms with the chosen Jw (V6).
+- **Integration:** semi-implicit Euler, physics dt = 1 ms, 20 substeps per 20 ms control step. The wheel-spin
+  states are stable at dt = 1 ms with the chosen Jw (checked in P1, gate V6).
 
 ### 2.3 Parameters (generic mid-size sedan; sources in `PARAMETERS.md`; frozen by prereg A1, 2026-11-08)
 | Param | Value | Param | Value |

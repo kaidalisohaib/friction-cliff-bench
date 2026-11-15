@@ -1,6 +1,6 @@
 # Compute benchmarks (NVIDIA GeForce RTX 5090 Laptop GPU, git e9470a07d2ee894e1b622099633c938b298c0d52)
 
-Harness output of `scripts/bench_compute.py`: median of N = 30 timed repetitions after a warm-up, [2.5, 97.5] percentile range in brackets. Engineering measurements, not evaluation results. GPU idle otherwise.
+Harness output of `scripts/bench/bench_compute.py`: median of N = 30 timed repetitions after a warm-up, [2.5, 97.5] percentile range in brackets. Engineering measurements, not evaluation results. GPU idle otherwise.
 
 ## MPPI latency per control step, one car [ms]
 

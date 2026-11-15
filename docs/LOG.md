@@ -1,6 +1,7 @@
 # LOG (dated notebook; newest first)
 
-Format per entry: date, phase, hours, what was done, and the verdict for any run (prediction → result).
+Each entry: date, phase, what was done, and the verdict for any run (prediction → result). Numbers in this log are
+engineering checks unless an entry says they come from the evaluation harness.
 
 ## Hours
 | Week of | Phase | Hours | Running total |
@@ -11,7 +12,7 @@ Format per entry: date, phase, hours, what was done, and the verdict for any run
 | 2026-11-02 | P1/G1 | ≈ 1.5 | ≈ 12 |
 | 2026-11-02 | P2 | ≈ 6 | ≈ 18 |
 
-## Tuning ledger (per method: trials, GPU-h, human-h)
+## Tuning ledger (per method: trials, GPU-h)
 - Oracles (not a tuned method; settings pilot on the tuning split, FEASIBILITY §3): 24 grid configs on 40 scenarios +
   K-check (2 × 200 scenarios × 5 seeds) + 2 hard-case variant scans; ≈ 1.0 GPU-h of oracle runs (shared GPU). Logs in `runs/`.
 - Tunable methods (final, 2026-11-11; GPU-h = wall time on a GPU often shared between jobs, which over-counts;
@@ -35,7 +36,8 @@ Format per entry: date, phase, hours, what was done, and the verdict for any run
 ## Entries
 
 ### 2026-11-14 evening: test v2 evaluated; A9 analysed (H4 non-inferior, H5 holds); write-up
-- **Evaluation:** `scripts/eval_v2.py`, 50 + 50 files (main, dry), 2,233 RF scenarios each, all complete; checkpoint
+- GPU: v2 evaluation ≈ 9 h wall on 3–4 streams (shared GPU).
+- **Evaluation:** `scripts/evaluate/eval_v2.py`, 50 + 50 files (main, dry), 2,233 RF scenarios each, all complete; checkpoint
   hashes verified against `ledgers/A9_frozen.json` by the runner. Analysis: `PYTHONPATH=. uv run python -m eval.followup`.
 - **Prediction → result** (harness, `docs/results/followup.md`, 95% hierarchical-bootstrap CIs):
   - H4 (P-SP2 non-inferior to M-Bc, margin 2 pp; predicted non-inferior, not superior) → departure difference
@@ -46,7 +48,7 @@ Format per entry: date, phase, hours, what was done, and the verdict for any run
     labelled in the output) shows the subset is slower (+2.2 pp [−0.2, +4.2]), so no claim is made from it.
 - **Engineering check:** the failing P-S2 seed (s2) departs 0.135 on the dry set as well, so it fails at lane
   keeping, not at adaptation.
-- **Latency** (`scripts/bench_policy.py`, `docs/results/compute_policy.md`; `--force`, because a short h2 recording job
+- **Latency** (`scripts/bench/bench_policy.py`, `docs/results/compute_policy.md`; `--force`, because another job
   shared the GPU): student forward pass 0.194 ms [0.192, 0.200] for one car on one CPU thread (N = 300). The 24-thread,
   64-car CPU cell is dominated by contention, and the md says so.
 - **Write-up:**
@@ -76,10 +78,10 @@ Format per entry: date, phase, hours, what was done, and the verdict for any run
 ### 2026-11-13/14 night: RL follow-up (D35), diagnosis of the PPO seed failures
 Training library, tuning split and the new dev split only. No test data used. Engineering numbers, not results.
 - **Tools:**
-  - `scripts/rl_diag.py`: one PPO run with `--set` overrides, logging-only diagnostics, snapshots;
-  - `scripts/rl_eval_tuning.py`: departure, dry departure, dry pace tax vs O-R and arrival ratio on tuning or dev
+  - `scripts/train/rl_diag.py`: one PPO run with `--set` overrides, logging-only diagnostics, snapshots;
+  - `scripts/evaluate/rl_eval_tuning.py`: departure, dry departure, dry pace tax vs O-R and arrival ratio on tuning or dev
     RF scenarios;
-  - `scripts/rl_distill.py`;
+  - `scripts/train/rl_distill.py`;
   - `runs/rl_fix/queue.sh`.
   - Runs are deterministic per seed: the A8 seed-4 collapse reproduces bit for bit.
 - **Dev split:** `splits/dev_v1.jsonl` (1,000 scenarios, new seed), labelled with the frozen oracles: 737 RF.
@@ -106,7 +108,8 @@ Training library, tuning split and the new dev split only. No test data used. En
   - c = 1: 0.0228 at 4.2%; 0.9: 0.0054 at 8.0%; 0.8: 0.0054 at 11.8%; 0.7: 0.0013 at 15.5%.
   - The best RL teachers reach 0 departures at 13–14%. RL is on, or marginally inside, the frontier, not
     clearly beyond it.
-- **Mistake:** a `pkill -f` pattern matched my own shell and killed it (no damage).
+- **Mistake:** a `pkill -f` pattern matched my own shell and killed it (no damage). Use exact PIDs or
+  `systemctl --user stop`.
 
 ### 2026-11-13 08:15: exploratory E1–E3 done
 - **Coverage:** 17 variants × 5 seeds × 500 RF test scenarios, all complete at 08:13. Outputs:
@@ -127,12 +130,12 @@ Training library, tuning split and the new dev split only. No test data used. En
   the best. → The instability comes from teacher training, not distillation.
 - **Caveat:** student variants share teacher seeds, but the bootstrap resamples seeds independently, so the student
   CIs are conservative. Noted in the generated text.
-- Drafted a follow-up: RL vs MPPI at matched pace on a fresh test pool.
+- Drafted a follow-up: RL vs MPPI at matched pace on a fresh test pool (became D35/A9).
 - Tests: 175 passed.
 
 ### 2026-11-13: P5 grounding, friction levels (MARWIS); exploratory E1–E3 launched
 - **MARWIS (MCity-WSPI, CC-BY-4.0):** 24 CSVs downloaded into gitignored `data_ext/wspi_marwis/raw` and verified
-  against SHA-256. They are read with `python -I scripts/wspi_marwis.py` (tested). Results are in
+  against SHA-256. They are read with `python -I scripts/report/wspi_marwis.py` (tested). Results are in
   `docs/results/grounding/marwis.md`; the report has a "Friction levels" paragraph and a figure.
   - Labelled Mcity drives give grip relative to dry of snow 0.30 [0.30, 0.35] (2,248 samples, 3 drives) and
     snow/ice 0.31 [0.30, 0.34] (1,436, 3). Cluster-bootstrap CIs over drives.
@@ -142,7 +145,7 @@ Training library, tuning split and the new dev split only. No test data used. En
   - Caveat: MARWIS is an optical grip proxy. Its value changes every ≈ 10 s, so it cannot check ramp sharpness.
     The Lufft numeric condition codes are undocumented, so Kalamazoo is used only as an unlabelled distribution.
   - → **Verdict:** the snow range matches these logs; the ice range is harsher than any labelled reading.
-- **Exploratory E1–E3 (prereg §Exploratory; outside the Holm family):** `scripts/exploratory.py` (tested where new:
+- **Exploratory E1–E3 (prereg §Exploratory; outside the Holm family):** `scripts/evaluate/exploratory.py` (tested where new:
   the action-distillation target in `rl/ppo.py`).
   - Evaluation set: the pre-declared 500-scenario RF test subset, nominal truth, batch 64, 5 seeds.
   - E1: W ∈ {0.1, 0.25, 0.5, 1.0} s for M-B, M-L and P-S. Students and estimators are retrained per W with the
@@ -157,7 +160,7 @@ Training library, tuning split and the new dev split only. No test data used. En
   - dry and H2: 9 levels on the 500-scenario subset (delay axis 486 after A6);
   - trace pass (exploratory).
   - C++ backend, batch 64. Units ran as `systemd-run --user` services after the second restart incident.
-  - `scripts/finalize.sh` → `docs/results/`, `paper/gen/`, README block, PDF.
+  - `scripts/report/finalize.sh` → `docs/results/`, `paper/gen/`, README block, PDF.
 - **Verdicts (prediction → result; numbers from `docs/results/results.md`, 3,009 RF scenarios × 5 seeds):**
   - **H1** (RL does not win by > 5 pp): not falsified. Departure(M-B) − departure(P-S) = -15.6 pp [-42.1, +1.0];
     equivalence not shown. The point estimate favours M-B. The CI is wide because P-S seeds range widely (seed 4
@@ -179,7 +182,7 @@ Training library, tuning split and the new dev split only. No test data used. En
 ### 2026-11-12 night: confirmatory test evaluation launched; D34; compute benchmark; engineering
 - **Compute benchmark** (`docs/results/compute_benchmarks.*`, N = 30, idle GPU) committed after a label fix. The
   simulator table printed the repetition count instead of the number of cars; the rates themselves were right.
-  `scripts/compute_tex.py` → `paper/gen/compute.tex`.
+  `scripts/report/compute_tex.py` → `paper/gen/compute.tex`.
 - **Batch-invariance check before the test run.** Prediction: records independent of batch size. Result: true for
   pure MPPI (O-R), false for M-B and P-S. The observation-noise generator is seeded per batch. Same law, different
   realisation. Every method is deterministic at a fixed batch. → D34: test evaluation at batch 64 (the tuning
@@ -187,8 +190,8 @@ Training library, tuning split and the new dev split only. No test data used. En
 - **Test evaluation launched** 2026-11-11 21:05 (`runs/eval_test/`: main, dry, h2 as three parallel jobs,
   C++ backend). Three jobs give about 3× the throughput of one: each job syncs to the host every control step, so
   one job alone leaves the GPU idle part of the time.
-- **Incident 2 (20:44, 11-12):** another session restart killed the jobs again. systemd stops the terminal session's cgroup
-  scope, and `setsid` cannot escape it. The jobs were relaunched as `systemd-run --user` units (own cgroups). Main
+- **Incident 2 (20:44, 11-12):** another session restart killed the jobs again. systemd stops the terminal session's
+  cgroup scope, and `setsid` cannot escape it. The jobs were relaunched as `systemd-run --user` units (own cgroups). Main
   was at 41/55; h2 was at delay-5.
 - **Incident:** at about 01:00 on 11-12 the session restart killed all three jobs (nohup was not enough; they shared
   the session's process group). About 1 h of in-progress (method, seed) pairs was lost; completed files are kept by
@@ -268,7 +271,7 @@ Training library, tuning split and the new dev split only. No test data used. En
   which the harness writes. Citations checked against the arXiv API (OptCar/Kalaria/Czechmanowski/Akki titles fixed).
 
 ### 2026-11-11 evening: P4 built (C++/CUDA MPPI, S3), evaluation pipeline + prereg A5, README v0; engineering, not results
-- Dropped the calendar milestones to finish the project in one push.
+- Dropped the calendar milestones and decided to finish the whole project in one push.
 - **C++/CUDA MPPI** (`mppi_cpp/`, D29):
   - one `__host__ __device__` source for CPU and GPU; CUDA + CPU drivers; GoogleTest 22/22;
   - ctypes binding on Warp device pointers;
@@ -288,7 +291,7 @@ Training library, tuning split and the new dev split only. No test data used. En
   - one-car latency is about equal, dominated by the 3,000 sequential substeps per rollout;
   - block reductions added for the weights/update steps.
 - **Evaluation pipeline:** `eval/runner.py` (main / H2 / dry sets), `eval/analysis.py` (H1–H3, Holm, secondary)
-  with synthetic-data tests, and `scripts/make_figures.py` (G4). **Prereg A5 + D30** fix the open evaluation details
+  with synthetic-data tests, and `scripts/report/make_figures.py` (G4). **Prereg A5 + D30** fix the open evaluation details
   before any test evaluation.
 - **Recovery latency (V4, exploratory, A5.9):** `eval/latency.py` + `--sets trace` (per-step e_y and r traces on
   the H2 subset; latency against O-R's trace with a 0.5 s hold; censored if never held). Tests: 3 pass.
@@ -303,7 +306,7 @@ Training library, tuning split and the new dev split only. No test data used. En
   - Engineering only.
 
 ### 2026-11-11: P3 resumed; engineering, not results
-- The GPU was free (another project idle). Started test-pool labelling, M-L and P-T tuning, and then P-TP once M-L
+- The GPU was free again. Started test-pool labelling, M-L and P-T tuning, and then P-TP once M-L
   finished.
 - **M-L tuning finished:** best failure rate 0.0725 on the 307 RF tuning scenarios (W = 5, hidden 64). M-B's best
   is 0.039.
@@ -318,9 +321,9 @@ Training library, tuning split and the new dev split only. No test data used. En
   test scenario has been evaluated by any method.
 - Tuning is resumable: `eval/tuning.py` now replays finished trials from the ledger (tested), and the ledger stores
   each trial's checkpoint tag.
-- M-B tuning is complete, M-L is at 14/20, and P-T has 1 trial. To resume, rerun the same tuning commands.
+- M-B tuning is complete, M-L is at 14/20, and P-T has 1 trial. To resume, rerun the same `scripts/train/tune_method.py` commands.
 
-### 2026-11-08 evening: long run, G2 → P3; engineering checks, not results
+### 2026-11-08 evening: G2 → P3; engineering checks, not results
 - **Decisions D19–D27, prereg A4** (see DECISIONS).
   - Every check below used tuning/training data only.
   - The test pool was labelled only after A4 was committed (997a231), with the frozen settings.
@@ -363,9 +366,9 @@ Training library, tuning split and the new dev split only. No test data used. En
   (25.6 m/s, R50 exit).
 - **RF composition:** W-PD (no friction information) succeeds on 139 of 152 tuning RF scenarios. The pooled-RF H1
   is dominated by scenarios where adaptation is not needed.
-- Proposed responses (to decide): v_eff for v_ref, the certificate and the strata; an S1 probe set; a K = 16k
+- Proposed responses: v_eff for v_ref, the certificate and the strata; an S1 probe set; a K = 16k
   check on the non-RF tuning scenarios; a pre-declared adaptation-required stratum. Nothing is labelled.
-- **2026-11-08 night (P2, GPU shared with another project's eval):**
+- **2026-11-08 night (P2; GPU shared with another project's eval):**
   - **Built and tested** (134 CPU tests + GPU slow tests):
     - batched Warp MPPI (rollout = truth sim to 1e-5, AR(1) noise, n_iter, ESS-targeted λ, PD ancillary sample with
       preview for O-C);
@@ -380,14 +383,14 @@ Training library, tuning split and the new dev split only. No test data used. En
   - **Pilot** (tuning split only): ρ = 0 best for O-R, ρ = 0.9 for O-C.
   - **K-check:** K = 1024 vs 4096 → 2/200 labels differ (one each way).
   - **S1:** 0 violations in every run.
-  - **Proposed:** D19, D20, D21 / A4 draft. **Test pool NOT labelled** (waits for review).
-- **2026-11-08 (G1 passed):** Approved D15 and D16. Parameters sourced with plausible ranges and confidence
+  - **Proposed:** D19, D20, D21 / A4 draft. **Test pool NOT labelled** (waits for A4).
+- **2026-11-08 (G1 passed):** D15 and D16 decided. Parameters sourced with plausible ranges and confidence
   levels (`PARAMETERS.md`; e.g. normalized yaw inertia 0.93 within the published 0.85–1.05 band, CdA from the
   0.85·W·H frontal-area rule on Camry dimensions, brake share = ideal at ≈ 0.56 g). Prereg amendments A1
   (parameter fingerprint), A2 (SHA-256 of the test pool, the three top-up blocks and the tuning split, committed
   under `splits/`), A3 (arrival-state S1, label precedence). `tests/test_frozen.py` enforces both freezes in CI (D17).
   Prediction: regenerating the sets from the frozen seeds reproduces the files, and tuning/test share no instance
-  → **confirmed** (114 tests pass). Not done: GPU throughput (another project's eval was running, so no GPU job was
+  → **confirmed** (114 tests pass). Not done: GPU throughput (another project's eval was using the GPU, so no GPU job was
   started) → moved to P2 start with the oracle compute budget (D18).
 - **2026-10-14 (P1, scenarios + certificate):** Tracks (5 shared, clothoid–arc–clothoid 90° curves), Frenet
   projection, per-axle per-substep friction field, prereg V7 sampler (deterministic, canonical JSONL; SHA not yet
@@ -408,26 +411,25 @@ Training library, tuning split and the new dev split only. No test data used. En
   iced axle jumps to its peak force; it stays on the linear part of the ice curve (sim matched the corrected
   calc). V2 now = (a) no steady turn above √(μgR) [soundness], (b) dry/wet within 3%, (c) snow/ice reported,
   (d) closed-loop dry circle.
-- **2026-10-14 (G0 passed):** Tagged and pushed `prereg-v1` (at `d640081`). Env verified, no prior head-to-head
+- **2026-10-14 (G0 passed):** Tagged and pushed `prereg-v1`. Env verified, no prior head-to-head
   found, prereg frozen. From now on the prereg changes only through dated amendments. P0 complete; next is P1.
-- **2026-10-14 (P0, prereg values approved):** Approved the remaining proposals (tuning budget, marginal and
-  recovery bands, S2 margin, H2 levels + test rule, test-split spec + seeds, RWD, M-B argmin) after a detailed
-  walkthrough. Values moved into a "Frozen values" section (V1–V8) and propagated to DESIGN, FEASIBILITY,
+- **2026-10-14 (P0, prereg values settled):** Settled the remaining proposals (tuning budget, marginal and
+  recovery bands, S2 margin, H2 levels + test rule, test-split spec + seeds, RWD, M-B argmin). Values moved into a
+  "Frozen values" section (V1–V8) and propagated to DESIGN, FEASIBILITY,
   EVAL_PROTOCOL, BASELINES. Also fixed: WSPI μ calibration (P5) can no longer change the frozen test split; it is an
-  appendix check. Remaining before the tag: a final review, then `git tag prereg-v1`.
-- **2026-10-14 (P0, decisions):** Approved the objective weights (prereg P1) and chose option B for the
+  appendix check. Remaining before the tag: a final review.
+- **2026-10-14 (P0, decisions):** Settled the objective weights (prereg P1) and chose option B for the
   delay conflict (D14: delay stays in RL DR, the MPPI bank/estimator cover the same 0–40 ms, H2 delay levels
   +{60, 100, 140} ms). Remaining prereg proposals (P2–P8) still pending approval.
-- **2026-10-14 (P0, follow-up):** Downloaded the Poznań extended-abstract PDF; read in full. Confirmed: no MPC
-  baseline, no RMA baseline run, smooth (not abrupt) friction, multi-lap memory. Scoop verdict unchanged. I
-  approved the G1 parameter-freeze timing (D13).
+- **2026-10-14 (P0, follow-up):** Downloaded the Poznań extended-abstract PDF by hand and read it in full. Confirmed: no MPC
+  baseline, no RMA baseline run, smooth (not abrupt) friction, multi-lap memory. Scoop verdict unchanged. Settled the G1
+  parameter-freeze timing (D13).
 - **2026-10-14 (P0, prereg drafting):** Proposed values for every remaining ⚠ written into
   `PREREGISTRATION.md` § "PROPOSED values" (objective weights, tuning budget, marginal and recovery bands, S2 margin,
   H2 levels + test, test-split sampler spec + verifiable seeds, drivetrain, M-B argmin). Found two inconsistencies:
   RL DR randomizes steering delay although delay is an H2 axis, and DESIGN says parameters are frozen "before
-  prereg-v1" but justified in P1. Fixes proposed. **Awaiting review; not tagged.**
-  Hours: ≈ 4.5 h equivalent (prior work ≈ 2.5, repos ≈ 1, env ≈ 0.5,
-  prereg ≈ 0.5).
+  prereg-v1" but justified in P1. Fixes proposed. Not tagged yet.
+  Hours: ≈ 4.5 (prior work ≈ 2.5, repos ≈ 1, env ≈ 0.5, prereg ≈ 0.5).
 - **2026-10-14 (P0, timeboxed repo checks, ~1 h of the 4 h box):** Both cloned and run only under `~/p0_scratch/`,
   each in its own venv. **LLA-MPC** (`dfe09e9`, MIT): runs with Py 3.10 + modern deps after disabling LaTeX/video;
   the full sudden-drop closed-loop run completes (only a final plot call fails on new matplotlib). μ̂ follows
@@ -441,8 +443,8 @@ Training library, tuning split and the new dev split only. No test data used. En
   blocked to scripted access). Web + arXiv-API searches recorded in `RELATED_WORK.md`. Prediction: no RMA-class vs
   adaptive-MPC head-to-head exists. **Verdict: confirmed, no head-to-head and no feasibility-labelled benchmark
   found as of 2026-10-14.** No scoop; stay on the main plan. Watch: LLA group (now does MPPI-vs-DR-PPO on legged
-  robots) and the Poznań group. Open follow-ups: read the Poznań PDF in a browser; IEEE Xplore was
-  not queried directly.
+  robots) and the Poznań group. Open follow-ups: read the Poznań PDF in a browser; IEEE Xplore was not queried
+  directly.
 - **2026-10-14 (P0, env check):** `uv sync` → Python 3.12.13, torch 2.14.1+cu130 (arch list includes sm_120;
   `cuda.is_available()` True; 4k×4k matmul OK), warp-lang 1.18.0 (Apache-2.0; bundles CUDA toolkit 13.4, driver
   13.0). Warp saxpy kernel runs on `cpu` and `cuda:0` (CPU exact; GPU max abs err ~1e-6 vs NumPy, consistent with
@@ -453,7 +455,7 @@ Training library, tuning split and the new dev split only. No test data used. En
   GCC 14.2.0. A hello-world saxpy built with `CMAKE_CUDA_ARCHITECTURES=120` gives native sm_120 SASS and runs
   correctly (runtime 13.3 on driver 13.0). Verification scripts live outside the repo (`~/p0_scratch/`).
   Verdict: env OK.
-- **2026-10-14:** Plan solidified. Docs: PLAN, DESIGN, FEASIBILITY, BASELINES, EVAL_PROTOCOL, PREREGISTRATION
+- **2026-10-14:** Plan solidified. Docs: DESIGN, FEASIBILITY, BASELINES, EVAL_PROTOCOL, PREREGISTRATION
   (draft), RELATED_WORK, DATA_AND_LICENSES. D1–D8, D10, D11 decided; D9 open. Next: P0 checklist.
 - **2026-10-13:** Project created (docs only) after a literature and design survey. Verdict on the original blueprint
   P2 idea: modify (fair baselines, feasibility labelling, current-μ teacher, C++/CUDA MPPI; terramechanics and

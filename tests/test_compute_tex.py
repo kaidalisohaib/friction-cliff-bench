@@ -1,4 +1,4 @@
-from scripts.compute_tex import policy_sentence
+from scripts.report.compute_tex import policy_sentence
 
 
 def test_policy_sentence_reads_the_bench_cells():

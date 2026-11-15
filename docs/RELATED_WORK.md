@@ -5,8 +5,7 @@ we found **no paper or public repo that trains an RMA-class (privileged teacher 
 and compares it head-to-head with fast adaptive MPC at abrupt friction drops**, and **no vehicle-adaptation
 benchmark with per-scenario feasibility labels**. This is "no prior head-to-head found as of 2026-10-14", not a
 claim of being first. Caveat: IEEE Xplore could not be queried directly (web search only). The Poznań extended abstract was read in
-full from a manually downloaded PDF.
-**Never claim "first".**
+full from a manually downloaded PDF. This project never claims to be "first".
 
 ## Closest work ("how we differ" confirmed in the P0 full-text check, 2026-10-14)
 Columns: **RMA?** = does it compare an RMA-class policy (privileged teacher → history student) head-to-head with
@@ -42,7 +41,7 @@ fast adaptive MPC at abrupt μ drops? **Feas.?** = does it label scenarios by ph
 - **Full texts read** (arXiv PDFs → `pdftotext`, read in full except references): 2505.19512 v1, 2409.15783 v1,
   2410.06565 v2, 2607.13319 v2, and 2610.10465 v1 (found during the search; read for its RL comparison).
 - **Poznań abstract:** located via the XPlore @ ICRA 2026 accepted-papers page. Scripted access to OpenReview was
-  blocked (HTTP 403); I downloaded the PDF and it was read in full the same day: no MPC baseline.
+  blocked (HTTP 403); I downloaded the PDF by hand and read it in full the same day: no MPC baseline.
 - **Web searches** (standard/extended): RMA teacher-student vs adaptive MPC friction driving; IEEE IV / T-IV / ITSC
   RL vs MPC low-friction / ice / sudden friction change; privileged teacher-student vehicle friction; "rapid motor
   adaptation" + racing/vehicle/F1TENTH; 2026 benchmark learned policy vs adaptive MPPI abrupt friction. IEEE Xplore
@@ -54,7 +53,7 @@ fast adaptive MPC at abrupt μ drops? **Feas.?** = does it label scenarios by ph
   (RL-augmented adaptive MPC, bipedal).
 - Other hits checked and ruled out: PPO lateral stability on low-adhesion / split-μ roads vs MPC and SMC (PMC12654942;
   search snippet only, full text not read; nothing in the snippet suggests an
-  RMA-class policy or adaptive MPC, to confirm); Lin et al. T-IV 2021 DRL vs MPC for ACC (car-following, no μ steps);
+  RMA-class policy or adaptive MPC); Lin et al. T-IV 2021 DRL vs MPC for ACC (car-following, no μ steps);
   adaptive-MPC review 2608.17902 (abstract: no RL comparison); hawaii-nc/f1tenth_benchmarks (copy of the Evans et
   al. F1TENTH benchmark: fixed-model MPCC + SAC/TD3).
 - **Verdict:** no head-to-head found; no scoop. Do not switch to replicate-and-audit (PLAN §6).

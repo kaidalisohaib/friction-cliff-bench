@@ -8,8 +8,7 @@ The robotics-blueprint "P2 extreme-dynamics slip-aware planner" keeps its questi
 adaptation at sudden friction loss) and drops its headline ("RL beats MPC"). Ranked against a pure C++ MPPI
 project (3.80), PufferDrive self-play (3.50), a kinematic→physics fidelity ladder (3.15), and the original as written
 (2.70), the modified version scored 4.30 (report §"The modified original ranks first"). Its descope floor *is* the
-C++ MPPI project. The old blueprint snippets are treated as nonexistent; everything is
-built from this spec.
+C++ MPPI project. The old blueprint's code snippets are not reused; everything is built from this spec.
 
 ## D2: Fair baselines, not a strawman. DECIDED 2026-10-14
 Constant-μ MPC is a context row only. The real baselines are bank-adaptive MPPI (LLA-MPC style) and
@@ -74,17 +73,17 @@ Conflict: RL DR randomized steering delay 0–40 ms, but delay is H2 mismatch ax
 neither side was prepared for. Options were (A) drop delay from DR, or (B) keep it and prepare the MPPI side
 equally. Chosen: **B**. RL DR uses extra actuator delay 0–40 ms on both channels; the M-B bank adds delay variants
 {0, 20, 40} ms; the M-L estimator also regresses the extra delay. H2 axis 3 moves to +{60, 100, 140} ms, beyond
-what either side has seen. Why: keeps the realistic robustness of DR without rigging H2 in RL's
+what either side has seen. Why: keeps the realistic robustness of DR (the point of keeping it) without rigging H2 in RL's
 favour. Cost: M-B bank is ~3× larger. Supersedes the "remove delay from DR" proposal.
 
-## D15: Tire surfaces re-sourced; separate longitudinal and lateral curves; understeer via axle stiffness. DECIDED 2026-10-14 (proposed values; frozen at G1 with D13) → approved and frozen 2026-11-08 (prereg A1)
+## D15: Tire surfaces re-sourced; separate longitudinal and lateral curves; understeer via axle stiffness. DECIDED 2026-10-14 (proposed values; frozen at G1 with D13) → frozen 2026-11-08 (prereg A1)
 Found in P1: the DESIGN "typical MF coefficients" (MathWorks Simscape table) describe *longitudinal* force only.
 Applied to lateral slip they put the ice lateral peak at ~21 deg (measured: 2-4 deg, CRREL). And with equal tire
 coefficients on both axles a bicycle model is exactly neutral-steer. Changes:
 1. Each surface has separate pure-slip curves (Bx, Cx, Ex) and (By, Cy, Ey), combined by the normalized
    slip-vector rule Fx = (sx/s) Fx0(s), Fy = (sy/s) Fy0(s). This keeps |F| <= mu Fz exactly (S4) and reduces to
    each pure curve; friction-ellipse H2 variant unchanged in spirit.
-2. Longitudinal shapes: least-squares fit to Burckhardt (1993) mu-slip curves (`scripts/fit_surfaces.py`,
+2. Longitudinal shapes: least-squares fit to Burckhardt (1993) mu-slip curves (`scripts/setup/fit_surfaces.py`,
    max error ~3% of peak). Lateral: dry/wet with Pacejka's typical C = 1.3, C_alpha/Fz = 17/rad, peaks at 7/6 deg;
    ice C = 1.6 with peak at 3 deg and marked drop-off, snow C = 1.0 rising to ~15 deg (CRREL measurements).
 3. Peak mu keeps the frozen prereg V7 ranges; only shapes change.
@@ -97,7 +96,7 @@ design: snow lateral force approaches its peak only at large angles). Sources st
 See `FEASIBILITY.md` §2.2. Needed because a clairvoyant oracle can pre-brake and arrive slower than the reference
 speed, so "no oracle succeeds in a certified-infeasible scenario" is not the right test for an arrival-state
 certificate. Requires a dated prereg amendment (S1 wording) before any test-split labelling.
-**Update 2026-11-08:** approved. Adopted as prereg amendment A3, which adds a label precedence rule
+**Update 2026-11-08:** adopted as prereg amendment A3, which adds a label precedence rule
 (reactive-feasible > preview-required > certified-infeasible > undetermined) and the *certified-reactive-infeasible*
 flag, so a scenario certified at the nominal arrival state but survived by a pre-braking O-C has exactly one label.
 
@@ -109,8 +108,8 @@ because a future numpy could change the random stream. `.gitattributes` marks th
 change their bytes.
 
 ## D18: GPU throughput measurement and the oracle compute budget move to the start of P2. DECIDED 2026-11-08
-Prereg V2/V7 ask for P1 throughput measurements (PPO run length; oracle labelling cost). The GPU was busy with an
-another project eval run during the G1 session (project rule 1), and the oracle cost depends on the MPPI kernel that
+Prereg V2/V7 ask for P1 throughput measurements (PPO run length; oracle labelling cost). The GPU was busy with another
+project's job during the G1 session, and the oracle cost depends on the MPPI kernel that
 P2 builds. Both measurements are made at the start of P2, and any K/horizon (V7) or G (V2) amendment is dated
 before any labelling or tuning starts. Planning projection (not a result): oracle labelling as specified
 (2 oracles × 5 seeds × 16k samples × 3 s horizon on 4,000 scenarios, 1 ms substeps in every rollout) is on the
@@ -153,7 +152,7 @@ GPU. Also proposes the observation-noise levels (`PARAMETERS.md` §7). Becomes p
 nothing in the test pool is labelled before that.
 
 
-## D19–D21 resolved. DECIDED 2026-11-08 (in-session
+## D19–D21 resolved. DECIDED 2026-11-08
 - **D19 handover: approved with the v_eff fix.** The P2 self-review (LOG 2026-11-08) found that v0 is unreachable
   on dry road in about 10% of cells. A scenario's effective reference speed is therefore
   v_eff = min(v0, √(0.7·μ0·g·R)) (`scenarios/sampler.py: v_eff`). v_eff is the objective's v_ref, the
@@ -172,7 +171,7 @@ K = 1024.
 - Otherwise freeze the larger K, if the test-pool compute stays ≤ 12 GPU-h; if not, freeze 4096.
 
 ## D23: S1 probe set. DECIDED 2026-11-08
-`scripts/s1_probe.py`: 96 apex snow/ice scenarios from their own seed, not part of any split. A dry driver at
+`scripts/setup/s1_probe.py`: 96 apex snow/ice scenarios from their own seed, not part of any split. A dry driver at
 0.9·μ0·g carries cars into the drop fast, and W-PD, O-R and M-N (2 seeds) run on them. S1 passes only if at least
 30 runs arrive in a certified state and none of those succeeds.
 - First run 2026-11-08: 480 runs, 278 certified arrivals, 0 successes → PASS. This is engineering, not a result.
@@ -235,7 +234,7 @@ PPO run reproduced the same objective exactly, 0.0113, which is how it showed up
 - Applies to every method equally (M-B never resumed, so it has 20 distinct configurations already).
 
 ## D29: C++17/CUDA MPPI backend: C ABI + ctypes, Warp-identical RNG, S3 tolerances, used for every MPPI method in the confirmatory runs. DECIDED 2026-11-11
-Built in `mppi_cpp/` (BASELINES §5), for the confirmatory runs.
+Built in `mppi_cpp/` (BASELINES §5).
 - **Shared source for CPU and GPU.** The dynamics, track projection, friction field, cost, path follower and every
   MPPI kernel body are `__host__ __device__` functions (`mppi_cpp/include/fcb/`). The CUDA driver maps them onto
   threads, and the CPU driver onto loops for GoogleTest. The weights and update steps use block reductions on the
@@ -295,7 +294,7 @@ What A5 adds to V6/V7/EVAL_PROTOCOL and why:
   4. **Exclude per axis (chosen).** Paired, decided before any method runs, reported. Expected to be rare (1/43
      at the worst delay level on tuning data).
 - **Implementation:** `control/episode.py: run_prefix(strict=False)`, `eval/runner.py: axis_exclusions`. The analysis
-  asserts that every level of an axis has the same scenario list. `scripts/eval_split.py` requires A6 in the
+  asserts that every level of an axis has the same scenario list. `scripts/evaluate/eval_split.py` requires A6 in the
   prereg before a test evaluation.
 
 ## D32: Separate adaptation from caution with pre-declared exploratory analyses (prereg A7). DECIDED 2026-11-11
@@ -350,16 +349,15 @@ What A5 adds to V6/V7/EVAL_PROTOCOL and why:
 - **Write-up:** the reproducibility statement names the batch size.
 
 ## D35: RL follow-up phase: diagnose and fix PPO training on training/tuning data only, then a pre-registered re-test on a fresh pool (A9). DECIDED 2026-11-13
-- **Goal:** improve the learned arm, so that the RL result is a solved problem rather than an
-  unstable one.
+- **Goal:** fix the learned arm, so that the RL result is a solved problem rather than an unstable one.
 - **What the confirmatory record already holds:** H1–H3 and E1–E7 on test v1 stand as reported. Nothing in this
   phase changes or re-analyses them.
 - **Rules for this phase:**
-  - diagnosis and recipe work use only the training library and the tuning split (`scripts/rl_diag.py`,
-    `scripts/rl_eval_tuning.py`; outputs in `runs/rl_fix/`);
+  - diagnosis and recipe work use only the training library and the tuning split (`scripts/train/rl_diag.py`,
+    `scripts/evaluate/rl_eval_tuning.py`; outputs in `runs/rl_fix/`);
   - test v1 is never used again for a decision;
   - a new claim needs amendment A9: hypotheses, recipe, comparator and a fresh test pool (v2). A9 is committed
-    before any v2 evaluation; it is tagged `prereg-v2`.
+    and tagged `prereg-v2` before any v2 evaluation.
 - **Parity:** extra engineering on the RL arm is logged. The MPPI arm gets the matching extra budget under A9.
 
 ## D36: The follow-up claims are non-inferiority at matched pace (H4) and per-seed reliability (H5), not "RL beats MPPI" (prereg A9). DECIDED 2026-11-14
@@ -387,3 +385,17 @@ What A5 adds to V6/V7/EVAL_PROTOCOL and why:
   labelled *post hoc* in every output (md, tex). No claim is drawn from the subset. It turned out slower than M-Bc
   (point estimate +2.2 pp).
 - **Not changed.** H4, H5 and the pre-declared exploratory contrasts: same code, same seeds, same numbers.
+
+## D38: Repository tidied and history squashed before publication. DECIDED 2026-11-14
+- **What changed:**
+  - Personal planning notes (schedule, study notes, the early survey drafts) were removed from the
+    repository and from its history.
+  - Scripts were grouped into `scripts/{setup,train,evaluate,report,bench}/`.
+  - Commits were squashed to at most seven per day. Author dates are kept, so the order of the pre-registration,
+    labelling and evaluation commits is unchanged.
+  - `prereg-v1` and `prereg-v2` point to the rewritten commits whose trees match the original tagged ones.
+- **Why `ledgers/commit_map.tsv`:** label metadata, ledgers, run records and a few log entries store the git commit
+  they ran at. Those hashes are from before the rewrite. The map translates each one to the squashed commit that
+  includes it (the last commit of its group, so it may also include a few later changes from the same day).
+- **Not changed:** no frozen value, split, label, ledger or result. `bash scripts/report/finalize.sh` regenerates
+  identical outputs.

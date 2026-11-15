@@ -86,7 +86,7 @@ class Surface:
 
     Sources (P1 parameter sourcing, D15):
     - longitudinal (Bx, Cx, Ex): least-squares fit of the MF shape to the Burckhardt mu-slip curve of that
-      surface (Burckhardt 1993; scripts/fit_surfaces.py), normalized to its own peak.
+      surface (Burckhardt 1993; scripts/setup/fit_surfaces.py), normalized to its own peak.
     - lateral (By, Cy, Ey): dry/wet use Pacejka's typical lateral shape factor C = 1.3, a cornering-stiffness
       coefficient C_alpha/Fz = 17 /rad at the nominal mu, and peak slip angles of 7 deg (dry) / 6 deg (wet);
       snow/ice follow CRREL winter-surface slip-angle measurements (ice: peak at 2-4 deg, then a marked
