@@ -1,7 +1,7 @@
 # DATA_AND_LICENSES
 
 Rule: **nothing NC-licensed is vendored or used for published claims.** Link to it instead of copying it.
-Own code: the license is chosen before the repository goes public (`DECISIONS.md` D9).
+Own code: MIT (`LICENSE`; `DECISIONS.md` D39). Third-party data and code keep their own licenses, listed below.
 
 | Resource | Use here | License / terms | Notes |
 |---|---|---|---|

@@ -13,7 +13,8 @@ This is a simulation benchmark for car control under abrupt tire–road friction
 compares an RMA-style PPO policy with adaptive MPPI and with known-friction oracles. Every scenario is first labelled
 by what is physically possible, and the hypotheses, metrics and statistics were pre-registered before any test
 scenario was labelled. The confirmatory runs use my own C++17/CUDA MPPI. The full write-up is the
-[technical report](paper/main.tex) (`cd paper && tectonic main.tex`).
+[technical report (PDF)](https://github.com/kaidalisohaib/friction-cliff-bench/releases/latest/download/friction-cliff-bench.pdf);
+the LaTeX source is in [`paper/`](paper/) (`cd paper && tectonic main.tex`).
 
 ## Findings
 - **Under parity, the learned policy did not beat the model-bank MPPI.** The point estimate favours the MPPI, and the
@@ -189,3 +190,6 @@ The technical report lists the rest.
 | [`docs/DECISIONS.md`](docs/DECISIONS.md) | Dated design decisions and their reasons |
 | [`docs/LOG.md`](docs/LOG.md) | Dated lab notebook: run verdicts, tuning ledger, incidents |
 | [`docs/results/`](docs/results/) | Harness output: results, follow-up, exploratory, compute, grounding |
+
+## License
+Code: MIT ([`LICENSE`](LICENSE)). Datasets used for grounding keep their own licenses ([`docs/DATA_AND_LICENSES.md`](docs/DATA_AND_LICENSES.md)).

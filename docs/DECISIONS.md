@@ -399,3 +399,9 @@ What A5 adds to V6/V7/EVAL_PROTOCOL and why:
   includes it (the last commit of its group, so it may also include a few later changes from the same day).
 - **Not changed:** no frozen value, split, label, ledger or result. `bash scripts/report/finalize.sh` regenerates
   identical outputs.
+
+## D39: D9 resolved: MIT license; the repository goes public on 2026-11-14. DECIDED 2026-11-14
+- The code is released under MIT (`LICENSE`). Third-party datasets and code keep their own licenses
+  (`DATA_AND_LICENSES.md`); none is vendored.
+- The repository goes public after the tidy-up in D38, with the pre-registration tags `prereg-v1` and `prereg-v2`
+  and a v1.0.0 release that carries the technical report PDF.
